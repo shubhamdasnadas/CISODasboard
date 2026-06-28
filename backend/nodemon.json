@@ -1,0 +1,7 @@
+{
+  "watch": ["server.js", "db.js", "migrate.js", "seed-data.js", "routes/", "middleware/"],
+  "ext": "js,json",
+  "ignore": ["node_modules/", "*.sql"],
+  "delay": 500,
+  "verbose": false
+}
