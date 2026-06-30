@@ -54,9 +54,12 @@ export function OrgProvider({ children }) {
     if (org) {
       setCurrentOrgState(org);
       localStorage.setItem(STORAGE_KEY, String(org.id));
+      // Keep the axios default header in sync so all API calls send the right org
+      api.defaults.headers.common['X-Org-Id'] = String(org.id);
     } else {
       setCurrentOrgState(null);
       localStorage.removeItem(STORAGE_KEY);
+      delete api.defaults.headers.common['X-Org-Id'];
     }
   }, []);
 

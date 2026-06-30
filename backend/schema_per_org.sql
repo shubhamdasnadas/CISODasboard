@@ -41,3 +41,188 @@ CREATE TABLE IF NOT EXISTS _seed_done (
   id SERIAL PRIMARY KEY,
   done_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ============================================================
+-- INTEGRATION TABLES (added for CISO Dashboard migration)
+-- ============================================================
+
+-- Integration credentials (SentinelOne, Firewall, Harmony)
+CREATE TABLE IF NOT EXISTS integration_credentials (
+  integration TEXT        PRIMARY KEY,
+  credentials JSONB       NOT NULL,
+  token       TEXT,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- SentinelOne
+CREATE TABLE IF NOT EXISTS s1_threats (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  threat_id TEXT        UNIQUE,
+  data      JSONB       NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS s1_agents (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id  TEXT        UNIQUE,
+  data      JSONB       NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS s1_application_agent (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  app_agent_id TEXT        UNIQUE,
+  data         JSONB       NOT NULL,
+  synced_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS s1_application_cve (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  cve_id    TEXT        UNIQUE,
+  data      JSONB       NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS s1_device_control (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  device_id TEXT        UNIQUE,
+  data      JSONB       NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS s1_rss (
+  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  rss_id    TEXT        UNIQUE,
+  data      JSONB       NOT NULL,
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Palo Alto Firewall
+CREATE TABLE IF NOT EXISTS firewall_reports (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_name TEXT        NOT NULL UNIQUE,
+  data        JSONB       NOT NULL,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS firewall_widgets (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_name TEXT        NOT NULL,
+  x_axis      TEXT[],
+  y_axis      TEXT[],
+  chart_type  TEXT        DEFAULT 'bar',
+  x           INT         NOT NULL DEFAULT 0,
+  y           INT         NOT NULL DEFAULT 0,
+  w           INT         NOT NULL DEFAULT 5,
+  h           INT         NOT NULL DEFAULT 6,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Check Point Harmony
+CREATE TABLE IF NOT EXISTS checkpoint_events (
+  id                   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id             TEXT        NOT NULL UNIQUE,
+  customer_id          TEXT,
+  type                 TEXT,
+  state                TEXT,
+  severity             TEXT,
+  confidence_indicator TEXT,
+  description          TEXT,
+  sender_address       TEXT,
+  saas                 TEXT,
+  entity_id            TEXT,
+  entity_link          TEXT,
+  event_created        TIMESTAMPTZ,
+  actions              JSONB,
+  additional_data      JSONB,
+  raw                  JSONB       NOT NULL,
+  synced_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Dashboard layout (per user)
+CREATE TABLE IF NOT EXISTS dashboard_layout (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    INTEGER     NOT NULL,
+  layout     JSONB       NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- Zoho
+CREATE TABLE IF NOT EXISTS zohotable (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  data_name  TEXT        NOT NULL UNIQUE,
+  data       JSONB       NOT NULL,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- General per-org tables
+CREATE TABLE IF NOT EXISTS projects (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT        NOT NULL,
+  key         TEXT        NOT NULL,
+  description TEXT,
+  status      TEXT        NOT NULL DEFAULT 'active',
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS reports (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT        NOT NULL,
+  description TEXT,
+  type        TEXT        NOT NULL DEFAULT 'custom',
+  data        JSONB,
+  status      TEXT        NOT NULL DEFAULT 'draft',
+  created_by  TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS notifications (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT        NOT NULL,
+  message     TEXT        NOT NULL,
+  type        TEXT        NOT NULL DEFAULT 'info',
+  is_read     BOOLEAN     NOT NULL DEFAULT FALSE,
+  target_user TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS support_tickets (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject     TEXT        NOT NULL,
+  description TEXT        NOT NULL,
+  status      TEXT        NOT NULL DEFAULT 'open',
+  priority    TEXT        NOT NULL DEFAULT 'medium',
+  created_by  TEXT,
+  assigned_to TEXT,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS billing (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  plan         TEXT        NOT NULL DEFAULT 'free',
+  amount       NUMERIC(10,2) NOT NULL DEFAULT 0,
+  currency     TEXT        NOT NULL DEFAULT 'USD',
+  status       TEXT        NOT NULL DEFAULT 'active',
+  billing_date TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS analytics_events (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  event      TEXT        NOT NULL,
+  page       TEXT,
+  "user"     TEXT,
+  metadata   JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS news_articles (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  source_id    TEXT,
+  source_name  TEXT,
+  author       TEXT,
+  title        TEXT        NOT NULL,
+  description  TEXT,
+  url          TEXT        NOT NULL,
+  url_to_image TEXT,
+  published_at TIMESTAMPTZ,
+  content      TEXT,
+  query_term   TEXT        NOT NULL,
+  fetched_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(query_term, url)
+);
