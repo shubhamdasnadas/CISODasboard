@@ -20,10 +20,10 @@ async function markMigrated(orgPool) {
 }
 
 async function migrateOrg(org) {
-  const orgPool = getOrgPool(org.id);
+  const orgPool = getOrgPool(org.slug);
 
   if (await isMigrated(orgPool)) {
-    console.log(`✔  ciso_org_${org.id}: already migrated`);
+    console.log(`✔  ciso_org_${org.slug}: already migrated`);
     return { tokens: 0, responses: 0 };
   }
 
@@ -52,7 +52,7 @@ async function migrateOrg(org) {
   }
 
   await markMigrated(orgPool);
-  console.log(`✔  ciso_org_${org.id}: migrated ${tokens.length} token(s), ${responses.length} response(s)`);
+  console.log(`✔  ciso_org_${org.slug}: migrated ${tokens.length} token(s), ${responses.length} response(s)`);
 
   return { tokens: tokens.length, responses: responses.length };
 }
@@ -60,7 +60,7 @@ async function migrateOrg(org) {
 async function runMigration() {
   console.log('🚚 Starting data migration to per-org databases...');
   const { rows: orgs } = await centralPool.query(
-    'SELECT id, org_name FROM organisations ORDER BY id ASC'
+    'SELECT id, slug, org_name FROM organisations ORDER BY id ASC'
   );
 
   if (orgs.length === 0) {

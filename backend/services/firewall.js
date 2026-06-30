@@ -45,12 +45,12 @@ const REPORTS = [
   'top-websites',
 ];
 
-async function syncFirewall(orgId, creds) {
+async function syncFirewall(orgSlug, creds) {
   const baseUrl = creds.baseUrl.replace(/\/$/, '');
   const apiKey = creds.apiKey;
-  const pool = getOrgPool(orgId);
+  const pool = getOrgPool(orgSlug);
 
-  console.log(`[FW sync][org=${orgId}] Starting collection of ${REPORTS.length} reports`);
+  console.log(`[FW sync][org=${orgSlug}] Starting collection of ${REPORTS.length} reports`);
 
   let successCount = 0;
   for (const report of REPORTS) {
@@ -69,11 +69,11 @@ async function syncFirewall(orgId, creds) {
       );
       successCount++;
     } catch (err) {
-      console.error(`[FW sync][org=${orgId}] Error on ${report}:`, err.message);
+      console.error(`[FW sync][org=${orgSlug}] Error on ${report}:`, err.message);
     }
   }
 
-  console.log(`[FW sync][org=${orgId}] Done — ${successCount}/${REPORTS.length} reports saved`);
+  console.log(`[FW sync][org=${orgSlug}] Done — ${successCount}/${REPORTS.length} reports saved`);
   return { success: successCount, total: REPORTS.length, syncedAt: new Date().toISOString() };
 }
 

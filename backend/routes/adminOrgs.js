@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { centralPool, getOrgPool, closeOrgPool, ensureOrgDatabases } = require('../db');
+const { centralPool, getOrgPool, getOrgSlug, closeOrgPool, ensureOrgDatabases } = require('../db');
 const { requireSuperAdmin } = require('../middleware/authMiddleware');
 
 // All admin org routes require superAdmin
@@ -78,8 +78,9 @@ router.put('/organizations/:id', async (req, res) => {
 // DELETE /api/admin/organizations/:id
 router.delete('/organizations/:id', async (req, res) => {
   try {
+    const orgSlug = await getOrgSlug(parseInt(req.params.id, 10));
     await centralPool.query('DELETE FROM organisations WHERE id = $1', [req.params.id]);
-    closeOrgPool(req.params.id);
+    if (orgSlug) closeOrgPool(orgSlug);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ message: err.message });

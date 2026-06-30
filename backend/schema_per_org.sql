@@ -1,6 +1,6 @@
 -- ============================================================
 -- CISO Dashboard — per-organisation schema
--- Runs against each per-org database (e.g. ciso_org_1, ciso_org_2).
+-- Runs against each per-org database (e.g. ciso_org_techsec, ciso_org_pcpl).
 -- No org_id columns — the database itself represents the org.
 --
 -- IMPORTANT: this schema is fully idempotent. It is applied to every

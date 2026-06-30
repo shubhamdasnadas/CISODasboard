@@ -1,6 +1,6 @@
 const express = require('express');
 const axios = require('axios');
-const { centralPool, getOrgPool } = require('../db');
+const { centralPool, getOrgPool, getOrgSlug } = require('../db');
 const { authMiddleware } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -14,8 +14,8 @@ function canAccessOrg(user, orgId) {
  * Look up the api_token and call the external endpoint, then store the result
  * in the per-org database (ciso_org_<orgId>).
  */
-async function fetchAndStore(orgId, apiName) {
-  const pool = getOrgPool(orgId);
+async function fetchAndStore(orgSlug, apiName) {
+  const pool = getOrgPool(orgSlug);
 
   const tokenResult = await pool.query(
     'SELECT token FROM api_tokens WHERE api_name = $1 LIMIT 1',
@@ -80,7 +80,9 @@ router.post('/fetch', authMiddleware, async (req, res) => {
     if (!canAccessOrg(req.user, orgId)) {
       return res.status(403).json({ error: 'Access denied for this org' });
     }
-    const saved = await fetchAndStore(orgId, api_name);
+    const orgSlug = await getOrgSlug(orgId);
+    if (!orgSlug) return res.status(404).json({ error: 'Organisation not found' });
+    const saved = await fetchAndStore(orgSlug, api_name);
     return res.json({ response: saved });
   } catch (err) {
     console.error('fetch error:', err);
@@ -98,7 +100,9 @@ router.get('/:orgId', authMiddleware, async (req, res) => {
     if (!canAccessOrg(req.user, orgId)) {
       return res.status(403).json({ error: 'Access denied for this org' });
     }
-    const pool = getOrgPool(orgId);
+    const orgSlug = await getOrgSlug(orgId);
+    if (!orgSlug) return res.status(404).json({ error: 'Organisation not found' });
+    const pool = getOrgPool(orgSlug);
     const result = await pool.query(
       `SELECT DISTINCT ON (api_name) id, api_name, response_data, fetched_at
          FROM api_responses

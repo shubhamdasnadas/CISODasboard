@@ -119,7 +119,7 @@ Expected:
   5 | BlueShield Healthcare
 ```
 
-> The per-org databases (`ciso_org_1` … `ciso_org_5`) are **not** created by
+> The per-org databases (`ciso_org_techsec` … `ciso_org_blueshield`) are **not** created by
 > `setup.sql`. They are created automatically the first time you start the
 > backend (see [Backend](#4-backend--setup--run)).
 
@@ -171,11 +171,11 @@ Expected console output:
 ```
 🔌 Central DB connection OK (localhost:5432/cisodashboard)
 ✅ Connected to central database: cisodashboard
-🆕 Created database: ciso_org_1 (for Techsec Global Private Ltd)
-✔  Database exists: ciso_org_2
-🆕 Created database: ciso_org_3 (for Acme Cyber Defense)
-🆕 Created database: ciso_org_4 (for Northwind Logistics)
-🆕 Created database: ciso_org_5 (for BlueShield Healthcare)
+🆕 Created database: ciso_org_techsec (for Techsec Global Private Ltd)
+✔  Database exists: ciso_org_pcpl
+🆕 Created database: ciso_org_acme (for Acme Cyber Defense)
+🆕 Created database: ciso_org_northwind (for Northwind Logistics)
+🆕 Created database: ciso_org_blueshield (for BlueShield Healthcare)
 🚚 Migration complete. Totals: 4 tokens, 0 responses.
 🌱 Seed complete. Totals: 11 tokens, 12 responses.
 🚀 CISO Dashboard API listening on http://localhost:5000

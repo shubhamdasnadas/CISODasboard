@@ -27,8 +27,8 @@ async function getHarmonyToken(clientId, accessKey) {
   return token;
 }
 
-async function syncHarmony(orgId, creds, eventTypes = DEFAULT_EVENT_TYPES) {
-  const pool = getOrgPool(orgId);
+async function syncHarmony(orgSlug, creds, eventTypes = DEFAULT_EVENT_TYPES) {
+  const pool = getOrgPool(orgSlug);
   const harmonyToken = await getHarmonyToken(creds.clientId, creds.accessKey);
 
   const allRecords = [];
@@ -44,7 +44,7 @@ async function syncHarmony(orgId, creds, eventTypes = DEFAULT_EVENT_TYPES) {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${harmonyToken}`,
-        'x-av-req-id': `harmony-cron-org${orgId}-page-${page}`,
+        'x-av-req-id': `harmony-cron-org${orgSlug}-page-${page}`,
       },
       body: JSON.stringify({ requestData }),
     });
@@ -104,7 +104,7 @@ async function syncHarmony(orgId, creds, eventTypes = DEFAULT_EVENT_TYPES) {
       );
       upserted++;
     } catch (err) {
-      console.error(`[Harmony sync][org=${orgId}] upsert error:`, err.message);
+      console.error(`[Harmony sync][org=${orgSlug}] upsert error:`, err.message);
     }
   }
 
@@ -112,7 +112,7 @@ async function syncHarmony(orgId, creds, eventTypes = DEFAULT_EVENT_TYPES) {
   const totalInDb = parseInt(rows[0].count, 10);
 
   console.log(
-    `[Harmony sync][org=${orgId}] Fetched ${allRecords.length}, upserted ${upserted}`
+    `[Harmony sync][org=${orgSlug}] Fetched ${allRecords.length}, upserted ${upserted}`
   );
   return {
     fetched: allRecords.length,

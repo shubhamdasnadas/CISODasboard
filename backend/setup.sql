@@ -143,12 +143,12 @@ INSERT INTO cron_config (key, value) VALUES ('total_shards', '1');
 -- ============================================================
 
 -- 5 organisations
-INSERT INTO organisations (org_name, address, mobile_no) VALUES
-('Techsec Global Private Ltd', 'Mumbai, MH',     '022-11110000'),
-('PCPL Construction',           'Pune, MH',       '020-22220000'),
-('Acme Cyber Defense',          'Bangalore, KA',  '080-33330000'),
-('Northwind Logistics',         'Delhi, DL',      '011-44440000'),
-('BlueShield Healthcare',       'Chennai, TN',    '044-55550000');
+INSERT INTO organisations (org_name, address, mobile_no, slug) VALUES
+('Techsec Global Private Ltd', 'Mumbai, MH',     '022-11110000', 'techsec'),
+('PCPL Construction',           'Pune, MH',       '020-22220000', 'pcpl'),
+('Acme Cyber Defense',          'Bangalore, KA',  '080-33330000', 'acme'),
+('Northwind Logistics',         'Delhi, DL',      '011-44440000', 'northwind'),
+('BlueShield Healthcare',       'Chennai, TN',    '044-55550000', 'blueshield');
 
 -- 7 users with REAL bcrypt password hashes (cost 10)
 INSERT INTO users (username, password, role, org_ids) VALUES

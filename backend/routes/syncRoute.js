@@ -59,22 +59,23 @@ router.post('/cron', async (req, res) => {
     try {
       const { centralPool, getOrgPool } = require('../db');
       const { rows: orgs } = await centralPool.query(
-        'SELECT id FROM organisations WHERE is_active = TRUE ORDER BY id'
+        'SELECT id, slug FROM organisations WHERE is_active = TRUE ORDER BY id'
       );
-      for (const { id: orgId } of orgs) {
+      for (const { id: orgId, slug: orgSlug } of orgs) {
+        if (!orgSlug) continue;
         try {
-          const pool = getOrgPool(orgId);
+          const pool = getOrgPool(orgSlug);
           const { rows: credsRows } = await pool.query(
             'SELECT integration, credentials FROM integration_credentials'
           );
           const creds = {};
           credsRows.forEach(r => { creds[r.integration] = r.credentials; });
 
-          if (creds.sentinelone) await syncSentinelOne(orgId, creds.sentinelone).catch(console.error);
-          if (creds.firewall) await syncFirewall(orgId, creds.firewall).catch(console.error);
-          if (creds.harmony) await syncHarmony(orgId, creds.harmony).catch(console.error);
+          if (creds.sentinelone) await syncSentinelOne(orgSlug, creds.sentinelone).catch(console.error);
+          if (creds.firewall) await syncFirewall(orgSlug, creds.firewall).catch(console.error);
+          if (creds.harmony) await syncHarmony(orgSlug, creds.harmony).catch(console.error);
         } catch (e) {
-          console.error(`[cron-sync] org ${orgId} failed:`, e.message);
+          console.error(`[cron-sync] org ${orgSlug} failed:`, e.message);
         }
       }
     } catch (e) {

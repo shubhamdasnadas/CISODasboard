@@ -1,5 +1,5 @@
 const express = require('express');
-const { centralPool, getOrgPool, closeOrgPool } = require('../db');
+const { centralPool, getOrgPool, getOrgSlug, closeOrgPool } = require('../db');
 const { authMiddleware, requireSuperAdmin } = require('../middleware/authMiddleware');
 const { Client } = require('pg');
 
@@ -11,10 +11,11 @@ const DB_USER = process.env.DB_USER || 'postgres';
 const DB_PASSWORD = process.env.DB_PASSWORD || 'root';
 
 async function dropOrgDatabase(orgId) {
-  const dbName = `ciso_org_${orgId}`;
+  const orgSlug = await getOrgSlug(orgId);
+  const dbName = orgSlug ? `ciso_org_${orgSlug}` : `ciso_org_${orgId}`;
   // Postgres requires connecting to a different DB before dropping one,
   // and no other sessions can be using it — so close the cached pool first.
-  closeOrgPool(orgId);
+  if (orgSlug) closeOrgPool(orgSlug);
 
   const client = new Client({
     host: DB_HOST,

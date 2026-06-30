@@ -1,5 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../api';
+import { useOrg } from '../context/OrgContext.jsx';
+import { fetchReportData } from './report/fetchReportData.js';
+import { generatePdfFromElement } from './report/generatePdf.js';
+import ReportDocument from './report/ReportDocument.jsx';
 
 const TYPE_CONFIG = {
   sales:      { label: 'Sales',      bg: 'bg-green-100 dark:bg-green-900/30',   text: 'text-green-700 dark:text-green-400' },
@@ -41,12 +45,58 @@ function StatusBadge({ status }) {
 }
 
 export default function Reports() {
+  const { currentOrg } = useOrg();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter]   = useState('all');
   const [form, setForm] = useState({ title: '', content: '', type: 'general', status: 'draft' });
   const [saving, setSaving]   = useState(false);
+
+  // PDF generation state
+  const [generating, setGenerating] = useState(false);
+  const [genStep, setGenStep]       = useState('');
+  const [genError, setGenError]     = useState('');
+  const [reportData, setReportData] = useState(null);
+  const reportRef = useRef(null);
+
+  const handleGeneratePdf = useCallback(async () => {
+    setGenerating(true);
+    setGenError('');
+    setGenStep('Fetching data…');
+    try {
+      const data = await fetchReportData(currentOrg?.name || 'Organisation');
+      setReportData(data);
+      setGenStep('Rendering report…');
+    } catch (err) {
+      setGenError('Failed to fetch report data. Please try again.');
+      setGenerating(false);
+      setGenStep('');
+    }
+  }, [currentOrg]);
+
+  // After reportData is set, ReportDocument renders; then we capture it
+  useEffect(() => {
+    if (!reportData || !reportRef.current) return;
+
+    // Give React one frame to finish rendering the hidden div
+    const timer = setTimeout(async () => {
+      setGenStep('Generating PDF…');
+      try {
+        const orgSlug = (currentOrg?.name || 'report').replace(/\s+/g, '_').toLowerCase();
+        const date    = new Date().toISOString().slice(0, 10);
+        await generatePdfFromElement(reportRef.current, `${orgSlug}_security_report_${date}.pdf`);
+      } catch (err) {
+        setGenError('PDF generation failed. Please try again.');
+      } finally {
+        setReportData(null);
+        setGenerating(false);
+        setGenStep('');
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [reportData, currentOrg]);
 
   const loadReports = () => {
     setLoading(true);
@@ -78,20 +128,60 @@ export default function Reports() {
   return (
     <div className="p-6 lg:p-8 space-y-5">
 
+      {/* Hidden report capture target */}
+      {reportData && (
+        <div ref={reportRef} style={{ position: 'fixed', left: '-9999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
+          <ReportDocument data={reportData} />
+        </div>
+      )}
+
+      {/* PDF generating overlay */}
+      {generating && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
+          <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-8 shadow-2xl flex flex-col items-center gap-4 min-w-[260px]">
+            <div className="w-12 h-12 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin" />
+            <div className="text-center">
+              <p className="font-semibold text-[var(--foreground)]">Generating PDF Report</p>
+              <p className="text-sm text-[var(--muted)] mt-1">{genStep}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">Reports</h1>
           <p className="text-sm text-[var(--muted)] mt-1">{reports.length} report{reports.length !== 1 ? 's' : ''}</p>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-          {showForm ? 'Cancel' : 'New Report'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGeneratePdf}
+            disabled={generating}
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            Generate PDF
+          </button>
+          <button
+            onClick={() => setShowForm((v) => !v)}
+            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            {showForm ? 'Cancel' : 'New Report'}
+          </button>
+        </div>
       </div>
+
+      {/* Error banner */}
+      {genError && (
+        <div className="flex items-center justify-between gap-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3">
+          <p className="text-sm text-red-700 dark:text-red-400">{genError}</p>
+          <button onClick={() => setGenError('')} className="text-red-400 hover:text-red-600 flex-shrink-0">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
 
       {/* Create form */}
       {showForm && (

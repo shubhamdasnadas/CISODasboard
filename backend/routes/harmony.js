@@ -68,7 +68,7 @@ router.post('/sync', async (req, res) => {
     if (!rows[0]) return res.status(400).json({ message: 'Harmony not configured' });
 
     const { eventTypes } = req.body;
-    const result = await syncHarmony(req.currentOrgId, rows[0].credentials, eventTypes);
+    const result = await syncHarmony(req.orgSlug, rows[0].credentials, eventTypes);
     res.json({ success: true, message: `Synced ${result.upserted} events`, ...result });
   } catch (err) {
     res.status(500).json({ message: err.message });

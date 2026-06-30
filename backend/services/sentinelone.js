@@ -41,7 +41,7 @@ async function fetchAllPages(baseUrl, apiToken, endpoint, extraParams = {}) {
   return all;
 }
 
-async function syncSentinelOne(orgId, creds) {
+async function syncSentinelOne(orgSlug, creds) {
   const baseUrl = (creds.baseUrl || process.env.S1_BASE_URL)?.replace(/\/$/, '');
   const apiToken = creds.tokenKey;
 
@@ -49,24 +49,24 @@ async function syncSentinelOne(orgId, creds) {
     throw new Error('SentinelOne not configured — provide tokenKey/baseUrl');
   }
 
-  const pool = getOrgPool(orgId);
+  const pool = getOrgPool(orgSlug);
 
-  console.log(`[S1 sync][org=${orgId}] Fetching threats...`);
+  console.log(`[S1 sync][org=${orgSlug}] Fetching threats...`);
   const threats = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/threats');
-  console.log(`[S1 sync][org=${orgId}] Got ${threats.length} threats`);
+  console.log(`[S1 sync][org=${orgSlug}] Got ${threats.length} threats`);
 
-  console.log(`[S1 sync][org=${orgId}] Fetching agents...`);
+  console.log(`[S1 sync][org=${orgSlug}] Fetching agents...`);
   const agents = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/agents');
-  console.log(`[S1 sync][org=${orgId}] Got ${agents.length} agents`);
+  console.log(`[S1 sync][org=${orgSlug}] Got ${agents.length} agents`);
 
-  console.log(`[S1 sync][org=${orgId}] Fetching application CVE risks...`);
+  console.log(`[S1 sync][org=${orgSlug}] Fetching application CVE risks...`);
   let cves = [];
   try {
     const cveParams = creds.accountId ? { accountIds: creds.accountId } : {};
     cves = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/application-management/risks', cveParams);
-    console.log(`[S1 sync][org=${orgId}] Got ${cves.length} CVE risk records`);
+    console.log(`[S1 sync][org=${orgSlug}] Got ${cves.length} CVE risk records`);
   } catch (e) {
-    console.warn(`[S1 sync][org=${orgId}] CVE risks fetch failed (non-fatal): ${e.message}`);
+    console.warn(`[S1 sync][org=${orgSlug}] CVE risks fetch failed (non-fatal): ${e.message}`);
   }
 
   await pool.query('TRUNCATE TABLE s1_threats');
@@ -101,7 +101,7 @@ async function syncSentinelOne(orgId, creds) {
     }
   }
 
-  console.log(`[S1 sync][org=${orgId}] Done.`);
+  console.log(`[S1 sync][org=${orgSlug}] Done.`);
   return { threats: threats.length, agents: agents.length, cves: cves.length, syncedAt: new Date().toISOString() };
 }
 

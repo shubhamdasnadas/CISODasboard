@@ -12,7 +12,7 @@ SoneTenancy project (Next.js / TypeScript / multi-tenant) into the CISODasboard 
 |---|---|---|
 | Framework | Next.js 16 + React 19 (TypeScript) | Express 4 + React/Vite (JavaScript) |
 | Auth | Cookie-based JWT | Bearer token JWT (Authorization header) |
-| Org identification | String slug (`saas_org_pcpl`) | Integer ID (`ciso_org_1`) |
+| Org identification | String slug (`saas_org_pcpl`) | Integer ID (`ciso_org_techsec`) |
 | Org DB naming | `saas_org_<slug>` | `ciso_org_<id>` |
 | DB query helper | `orgQuery(orgSlug, sql)` | `req.orgPool.query(sql)` |
 | Frontend data fetching | `useSWR` | `useEffect + api.get()` |

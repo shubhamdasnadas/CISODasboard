@@ -44,7 +44,7 @@ router.post('/sync', async (req, res) => {
     );
     if (!rows[0]) return res.status(400).json({ message: 'SentinelOne not configured' });
 
-    const result = await syncSentinelOne(req.currentOrgId, rows[0].credentials);
+    const result = await syncSentinelOne(req.orgSlug, rows[0].credentials);
     res.json({ success: true, message: `Synced ${result.threats} threats, ${result.agents} agents`, ...result });
   } catch (err) {
     res.status(500).json({ message: err.message });

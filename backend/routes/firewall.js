@@ -44,7 +44,7 @@ router.post('/collect', async (req, res) => {
     );
     if (!rows[0]) return res.status(400).json({ message: 'Firewall not configured' });
 
-    const result = await syncFirewall(req.currentOrgId, rows[0].credentials);
+    const result = await syncFirewall(req.orgSlug, rows[0].credentials);
     res.json({
       message: `Collected ${result.success}/${result.total} reports`,
       ...result,

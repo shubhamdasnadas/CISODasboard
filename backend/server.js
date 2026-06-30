@@ -82,26 +82,27 @@ app.use('/api/admin', [authMiddleware], adminOrgsRoutes);
  */
 async function runBackgroundJob() {
   try {
-    const { rows: orgs } = await centralPool.query('SELECT id FROM organisations ORDER BY id ASC');
+    const { rows: orgs } = await centralPool.query('SELECT id, slug FROM organisations ORDER BY id ASC');
     let total = 0;
 
-    for (const { id: orgId } of orgs) {
+    for (const { id: orgId, slug: orgSlug } of orgs) {
+      if (!orgSlug) continue;
       let tokens;
       try {
-        const pool = getOrgPool(orgId);
+        const pool = getOrgPool(orgSlug);
         const r = await pool.query('SELECT api_name FROM api_tokens ORDER BY id ASC');
         tokens = r.rows;
       } catch (e) {
-        console.error(`[cron] Cannot read tokens for org=${orgId}:`, e.message);
+        console.error(`[cron] Cannot read tokens for org=${orgSlug}:`, e.message);
         continue;
       }
 
       for (const { api_name } of tokens) {
         try {
-          await fetchAndStore(orgId, api_name);
+          await fetchAndStore(orgSlug, api_name);
           total += 1;
         } catch (e) {
-          console.error(`[cron] Failed org=${orgId} api=${api_name}:`, e.message);
+          console.error(`[cron] Failed org=${orgSlug} api=${api_name}:`, e.message);
         }
       }
     }
@@ -117,11 +118,12 @@ async function runBackgroundJob() {
 async function runIntegrationSync() {
   try {
     const { rows: orgs } = await centralPool.query(
-      'SELECT id FROM organisations WHERE is_active = TRUE ORDER BY id'
+      'SELECT id, slug FROM organisations WHERE is_active = TRUE ORDER BY id'
     );
-    for (const { id: orgId } of orgs) {
+    for (const { id: orgId, slug: orgSlug } of orgs) {
+      if (!orgSlug) continue;
       try {
-        const pool = getOrgPool(orgId);
+        const pool = getOrgPool(orgSlug);
         const { rows: credsRows } = await pool.query(
           'SELECT integration, credentials FROM integration_credentials'
         );
@@ -129,22 +131,22 @@ async function runIntegrationSync() {
         credsRows.forEach(r => { creds[r.integration] = r.credentials; });
 
         if (creds.sentinelone) {
-          await syncSentinelOne(orgId, creds.sentinelone).catch(e =>
-            console.error(`[int-cron][org=${orgId}] S1 error:`, e.message)
+          await syncSentinelOne(orgSlug, creds.sentinelone).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] S1 error:`, e.message)
           );
         }
         if (creds.firewall) {
-          await syncFirewall(orgId, creds.firewall).catch(e =>
-            console.error(`[int-cron][org=${orgId}] FW error:`, e.message)
+          await syncFirewall(orgSlug, creds.firewall).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] FW error:`, e.message)
           );
         }
         if (creds.harmony) {
-          await syncHarmony(orgId, creds.harmony).catch(e =>
-            console.error(`[int-cron][org=${orgId}] CP error:`, e.message)
+          await syncHarmony(orgSlug, creds.harmony).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] CP error:`, e.message)
           );
         }
       } catch (e) {
-        console.error(`[int-cron] org ${orgId} failed:`, e.message);
+        console.error(`[int-cron] org ${orgSlug} failed:`, e.message);
       }
     }
     console.log('[int-cron] Integration sync complete');
