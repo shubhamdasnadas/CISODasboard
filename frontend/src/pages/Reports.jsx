@@ -79,13 +79,21 @@ export default function Reports() {
   useEffect(() => {
     if (!reportData || !reportRef.current) return;
 
-    // Give React one frame to finish rendering the hidden div
+    // Allow time for React to render + Recharts SVGs to paint
     const timer = setTimeout(async () => {
       setGenStep('Generating PDF…');
       try {
         const orgSlug = (currentOrg?.name || 'report').replace(/\s+/g, '_').toLowerCase();
         const date    = new Date().toISOString().slice(0, 10);
-        await generatePdfFromElement(reportRef.current, `${orgSlug}_security_report_${date}.pdf`);
+        const filename = `${orgSlug}_security_report_${date}.pdf`;
+        await generatePdfFromElement(reportRef.current, filename);
+        await api.post('/reports', {
+          title:   `Security Report — ${currentOrg?.name || 'Organisation'} — ${date}`,
+          content: `Auto-generated PDF security report covering Checkpoint Harmony, SentinelOne, and Palo Alto Firewall data. File: ${filename}`,
+          type:    'security',
+          status:  'published',
+        });
+        loadReports();
       } catch (err) {
         setGenError('PDF generation failed. Please try again.');
       } finally {
@@ -93,7 +101,7 @@ export default function Reports() {
         setGenerating(false);
         setGenStep('');
       }
-    }, 300);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [reportData, currentOrg]);
@@ -128,10 +136,12 @@ export default function Reports() {
   return (
     <div className="p-6 lg:p-8 space-y-5">
 
-      {/* Hidden report capture target */}
+      {/* Hidden report capture target — off-screen so browser fully paints SVG charts */}
       {reportData && (
-        <div ref={reportRef} style={{ position: 'fixed', left: '-9999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
-          <ReportDocument data={reportData} />
+        <div style={{ position: 'fixed', top: '-9999px', left: 0, width: '1100px', pointerEvents: 'none' }}>
+          <div ref={reportRef}>
+            <ReportDocument data={reportData} />
+          </div>
         </div>
       )}
 

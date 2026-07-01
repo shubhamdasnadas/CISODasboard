@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import api from '../../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 
-const STATUS_COLORS = { Open: '#3b82f6', Closed: '#22c55e', 'On Hold': '#f59e0b', Escalated: '#ef4444' };
-const PRIORITY_COLORS = { High: '#ef4444', Medium: '#f59e0b', Low: '#22c55e' };
+const STATUS_COLORS = { Open: '#3b82f6', Closed: '#22c55e', 'On Hold': '#f59e0b', Escalated: '#ef4444', 'In Progress': '#8b5cf6', Resolved: '#10b981' };
+const PRIORITY_COLORS = { High: '#ef4444', Critical: '#dc2626', Medium: '#f59e0b', Low: '#22c55e' };
 
 export default function ZohoPage() {
   const [tickets, setTickets] = useState([]);

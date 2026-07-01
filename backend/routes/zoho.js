@@ -45,9 +45,18 @@ router.post('/sync', async (req, res) => {
 router.get('/tickets-db', async (req, res) => {
   try {
     const { rows } = await req.orgPool.query(
-      "SELECT data FROM zohotable WHERE data_name = 'tickets' LIMIT 1"
+      'SELECT * FROM support_tickets ORDER BY created_at DESC'
     );
-    res.json({ tickets: rows[0]?.data ?? [] });
+    const capitalize = (s) => s ? s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Unknown';
+    const tickets = rows.map(r => ({
+      subject:      r.subject,
+      status:       capitalize(r.status),
+      priority:     capitalize(r.priority),
+      contact_name: r.created_by || '',
+      created_time: r.created_at,
+      description:  r.description,
+    }));
+    res.json({ tickets });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

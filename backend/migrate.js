@@ -19,8 +19,17 @@ async function markMigrated(orgPool) {
   await orgPool.query('INSERT INTO _migration_done DEFAULT VALUES');
 }
 
+async function applySchemaPatches(orgPool, slug) {
+  await orgPool.query(
+    'ALTER TABLE s1_agents ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ'
+  );
+  console.log(`✔  ciso_org_${slug}: schema patches applied`);
+}
+
 async function migrateOrg(org) {
   const orgPool = getOrgPool(org.slug);
+
+  await applySchemaPatches(orgPool, org.slug);
 
   if (await isMigrated(orgPool)) {
     console.log(`✔  ciso_org_${org.slug}: already migrated`);

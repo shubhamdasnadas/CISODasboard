@@ -32,8 +32,9 @@ export default function Settings() {
       await api.put('/sentinelone/credentials', { accountId: s1AccountId.trim(), tokenKey: s1TokenKey.trim(), baseUrl: s1BaseUrl.trim() });
       setS1Status('syncing'); setS1Msg('Syncing SentinelOne data…');
       const r = await api.post('/sentinelone/sync');
-      setS1Msg(r.data.message || 'Sync complete');
-      setS1Status('done');
+      const warnings = r.data.warnings?.length ? ` ⚠ ${r.data.warnings.join('; ')}` : '';
+      setS1Msg((r.data.message || 'Sync complete') + warnings);
+      setS1Status(r.data.warnings?.length ? 'error' : 'done');
     } catch (err) {
       setS1Msg(err.response?.data?.message || 'Error');
       setS1Status('error');

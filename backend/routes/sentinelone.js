@@ -45,7 +45,14 @@ router.post('/sync', async (req, res) => {
     if (!rows[0]) return res.status(400).json({ message: 'SentinelOne not configured' });
 
     const result = await syncSentinelOne(req.orgSlug, rows[0].credentials);
-    res.json({ success: true, message: `Synced ${result.threats} threats, ${result.agents} agents`, ...result });
+    const warnings = [];
+    if (result.installedAppsError) warnings.push(`Installed apps: ${result.installedAppsError}`);
+    res.json({
+      success: true,
+      message: `Synced ${result.threats} threats, ${result.agents} agents, ${result.installedApps} installed apps`,
+      warnings: warnings.length ? warnings : undefined,
+      ...result,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -61,10 +68,24 @@ router.get('/db/threats', async (req, res) => {
   }
 });
 
+// GET /api/sentinelone/db/agents/removed-count
+router.get('/db/agents/removed-count', async (req, res) => {
+  try {
+    const { rows } = await req.orgPool.query(
+      `SELECT COUNT(*)::int AS count FROM s1_agents WHERE removed_at IS NOT NULL`
+    );
+    res.json({ count: rows[0].count });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/sentinelone/db/agents
 router.get('/db/agents', async (req, res) => {
   try {
-    const { rows } = await req.orgPool.query('SELECT data FROM s1_agents ORDER BY synced_at DESC');
+    const { rows } = await req.orgPool.query(
+      'SELECT data FROM s1_agents WHERE removed_at IS NULL ORDER BY synced_at DESC'
+    );
     res.json({ agents: rows.map(r => r.data) });
   } catch (err) {
     res.status(500).json({ message: err.message });

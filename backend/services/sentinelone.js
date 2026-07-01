@@ -79,14 +79,46 @@ async function syncSentinelOne(orgSlug, creds) {
     );
   }
 
-  await pool.query('TRUNCATE TABLE s1_agents');
+  const fetchedAgentIds = new Set(agents.map(a => String(a.id)).filter(Boolean));
   for (const a of agents) {
     const id = a.id || null;
     await pool.query(
-      `INSERT INTO s1_agents (agent_id, data) VALUES ($1, $2::jsonb)
-       ON CONFLICT (agent_id) DO UPDATE SET data = EXCLUDED.data, synced_at = NOW()`,
+      `INSERT INTO s1_agents (agent_id, data, removed_at)
+       VALUES ($1, $2::jsonb, NULL)
+       ON CONFLICT (agent_id) DO UPDATE
+         SET data = EXCLUDED.data, synced_at = NOW(), removed_at = NULL`,
       [id, JSON.stringify(a)]
     );
+  }
+  if (fetchedAgentIds.size > 0) {
+    await pool.query(
+      `UPDATE s1_agents SET removed_at = NOW()
+       WHERE removed_at IS NULL AND NOT (agent_id = ANY($1::text[]))`,
+      [Array.from(fetchedAgentIds)]
+    );
+  }
+
+  console.log(`[S1 sync][org=${orgSlug}] Fetching installed applications...`);
+  let installedApps = [];
+  let installedAppsError = null;
+  try {
+    installedApps = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/application-management/installed-apps');
+    console.log(`[S1 sync][org=${orgSlug}] Got ${installedApps.length} installed app records`);
+    if (installedApps.length > 0) {
+      await pool.query('TRUNCATE TABLE s1_application_agent');
+      for (const app of installedApps) {
+        const id = String(app.id || `${app.agentId || ''}_${app.name || ''}_${app.version || ''}`);
+        await pool.query(
+          `INSERT INTO s1_application_agent (app_agent_id, data)
+           VALUES ($1, $2::jsonb)
+           ON CONFLICT (app_agent_id) DO UPDATE SET data = EXCLUDED.data, synced_at = NOW()`,
+          [id, JSON.stringify(app)]
+        );
+      }
+    }
+  } catch (e) {
+    installedAppsError = e.message;
+    console.warn(`[S1 sync][org=${orgSlug}] Installed apps fetch failed (non-fatal): ${e.message}`);
   }
 
   if (cves.length > 0) {
@@ -102,7 +134,14 @@ async function syncSentinelOne(orgSlug, creds) {
   }
 
   console.log(`[S1 sync][org=${orgSlug}] Done.`);
-  return { threats: threats.length, agents: agents.length, cves: cves.length, syncedAt: new Date().toISOString() };
+  return {
+    threats: threats.length,
+    agents: agents.length,
+    cves: cves.length,
+    installedApps: installedApps.length,
+    installedAppsError: installedAppsError || null,
+    syncedAt: new Date().toISOString(),
+  };
 }
 
 module.exports = { syncSentinelOne };

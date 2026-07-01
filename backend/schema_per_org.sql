@@ -62,10 +62,11 @@ CREATE TABLE IF NOT EXISTS s1_threats (
   synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE IF NOT EXISTS s1_agents (
-  id        UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  agent_id  TEXT        UNIQUE,
-  data      JSONB       NOT NULL,
-  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id   TEXT        UNIQUE,
+  data       JSONB       NOT NULL,
+  synced_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  removed_at TIMESTAMPTZ
 );
 CREATE TABLE IF NOT EXISTS s1_application_agent (
   id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
