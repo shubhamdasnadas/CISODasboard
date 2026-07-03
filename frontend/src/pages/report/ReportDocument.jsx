@@ -1,12 +1,12 @@
 import { useMemo } from 'react';
 import {
   Cell,
-  PieChart, Pie,
   BarChart, Bar, LabelList,
   LineChart, Line,
   ComposedChart, Area,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
+import { PdfPieChart } from './PdfPieChart';
 
 // ── Colours ──────────────────────────────────────────────────────────────────
 const COLORS      = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#ec4899','#84cc16'];
@@ -85,7 +85,6 @@ const makeTopChartData = (rows, cols, limit = 8) => {
   return Array.from(map.entries())
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
-    .reverse()
     .map(([name, value]) => ({ name: name.length > 30 ? name.slice(0, 30) + '…' : name, value }));
 };
 
@@ -102,8 +101,99 @@ const makeRiskTrendData = (rows) => {
   return Array.from(map.values()).sort((a, b) => new Date(a.date) - new Date(b.date)).slice(-14);
 };
 
+// ── Logo placeholders — replace null with your imported asset ─────────────────
+// import checkpointLogo  from './logos/checkpoint.png';
+// import sentinelOneLogo from './logos/sentinelone.png';
+// import paloAltoLogo    from './logos/paloalto.png';
+// import zohoLogo        from './logos/zoho.png';
+const checkpointLogo  = null;
+const sentinelOneLogo = null;
+const paloAltoLogo    = null;
+const zohoLogo        = null;
+
+// ── Section cover page ────────────────────────────────────────────────────────
+// Height fills the A4-landscape page at 1400px render width (pageH ≈ 990px).
+// 976px leaves a 14px safety margin against sub-pixel rounding.
+function SectionCoverPage({ number, title, subtitle, color, logo, logoLabel }) {
+  return (
+    <div data-pdf-block="true" style={{
+      width: '100%', height: 976,
+      background: '#0f172a',
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden', position: 'relative',
+    }}>
+      {/* Top accent bar */}
+      <div style={{ height: 5, background: color, flexShrink: 0 }} />
+
+      {/* Main body */}
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 80px', gap: 64, position: 'relative', zIndex: 1 }}>
+
+        {/* Text */}
+        <div style={{ flex: 1 }}>
+          <p style={{ margin: '0 0 14px', fontSize: 12, fontWeight: 700, color, textTransform: 'uppercase', letterSpacing: '0.14em' }}>
+            Section {number}
+          </p>
+          <h2 style={{ margin: '0 0 24px', fontSize: 46, fontWeight: 800, color: '#fff', lineHeight: 1.15, letterSpacing: '-0.02em' }}>
+            {title}
+          </h2>
+          <p style={{ margin: 0, fontSize: 15, color: '#94a3b8', lineHeight: 1.8, maxWidth: 520 }}>
+            {subtitle}
+          </p>
+        </div>
+
+        {/* Logo box */}
+        <div style={{ width: 250, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{
+            width: 220, height: 148,
+            border: '2px dashed rgba(255,255,255,0.13)',
+            borderRadius: 14,
+            display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 12,
+            background: 'rgba(255,255,255,0.03)',
+          }}>
+            {logo ? (
+              <img src={logo} alt={title} style={{ maxWidth: 160, maxHeight: 100, objectFit: 'contain' }} />
+            ) : (
+              <>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+                </svg>
+                <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.2)', textAlign: 'center', fontStyle: 'italic', lineHeight: 1.5, padding: '0 16px' }}>
+                  {logoLabel || 'Logo placeholder'}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Faded section-number watermark */}
+      <div style={{
+        position: 'absolute', right: -8, bottom: 44, zIndex: 0,
+        fontSize: 220, fontWeight: 900, lineHeight: 1,
+        color: 'rgba(255,255,255,0.03)', userSelect: 'none', pointerEvents: 'none',
+      }}>
+        {String(number).padStart(2, '0')}
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{
+        height: 44, flexShrink: 0,
+        borderTop: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center',
+        padding: '0 80px', justifyContent: 'space-between', position: 'relative', zIndex: 1,
+      }}>
+        <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          CISO Security Report
+        </p>
+        <div style={{ height: 2, width: 140, background: `linear-gradient(to right, ${color}, transparent)`, borderRadius: 2 }} />
+      </div>
+    </div>
+  );
+}
+
 // ── Layout primitives ─────────────────────────────────────────────────────────
-const TT_STYLE = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 12 };
+const TT_STYLE = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 };
 
 function SectionHeader({ number, title, color = '#4f46e5', children }) {
   return (
@@ -112,9 +202,9 @@ function SectionHeader({ number, title, color = '#4f46e5', children }) {
         <div style={{
           width: 28, height: 28, borderRadius: 6, background: color,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontWeight: 700, fontSize: 14, flexShrink: 0,
+          color: '#fff', fontWeight: 700, fontSize: 15, flexShrink: 0,
         }}>{number}</div>
-        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#111827', borderBottom: `2px solid ${color}`, paddingBottom: 4, flex: 1 }}>{title}</h2>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#111827', borderBottom: `2px solid ${color}`, paddingBottom: 4, flex: 1 }}>{title}</h2>
       </div>
       {children}
     </div>
@@ -127,28 +217,29 @@ function KpiCard({ label, value, sub, color = '#4f46e5' }) {
       background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10,
       padding: '14px 18px', flex: '1 1 0', minWidth: 120,
     }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 800, color }}>{value}</div>
-      {sub && <div style={{ fontSize: 14, color: '#9ca3af', marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontSize: 15, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 30, fontWeight: 800, color }}>{value}</div>
+      {sub && <div style={{ fontSize: 15, color: '#9ca3af', marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
 
 // w = explicit pixel width of the card (required to prevent overflow)
-function ChartCard({ title, children, w, description }) {
+// compact = reduces header and content padding to shrink card height without touching chart size
+function ChartCard({ title, children, w, description, compact }) {
   return (
     <div style={{
       background: '#fff', border: '1px solid #e5e7eb', borderRadius: 10,
       flexShrink: 0,
       width: w ?? 'auto',
     }}>
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: '#374151' }}>{title}</p>
+      <div style={{ padding: compact ? '6px 14px' : '10px 14px', borderBottom: '1px solid #f3f4f6', background: '#f9fafb' }}>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#374151' }}>{title}</p>
       </div>
-      <div style={{ padding: '10px 0 10px 0' }}>{children}</div>
+      <div style={{ padding: compact ? '4px 0' : '10px 0 10px 0' }}>{children}</div>
       {description && (
         <div style={{ padding: '6px 14px 10px', borderTop: '1px solid #f3f4f6' }}>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280', fontStyle: 'italic', lineHeight: 1.55 }}>{description}</p>
+          <p style={{ margin: 0, fontSize: 15, color: '#6b7280', fontStyle: 'italic', lineHeight: 1.55 }}>{description}</p>
         </div>
       )}
     </div>
@@ -180,27 +271,33 @@ function ChartRow({ children, mb = 12 }) {
   );
 }
 
-// Layout constants — content area = 1100 − 64px section padding = 1036px
+// Layout constants — content area = 1400 − 64px section padding = 1336px
 // Card border = 1px each side → inner = card_w − 2. Chart fills inner.
-const W2  = 512;   // 2-col card width:  (1036 − 12) / 2 = 512
-const W3  = 337;   // 3-col card width:  (1036 − 24) / 3 ≈ 337
-const WF  = 1036;  // full-width card
+const W2  = 662;   // 2-col card width:  (1336 − 12) / 2 = 662
+const W3  = 437;   // 3-col card width:  (1336 − 24) / 3 ≈ 437
+const WF  = 1336;  // full-width card
 const CW2 = W2  - 2;  // chart width inside 2-col card
 const CW3 = W3  - 2;  // chart width inside 3-col card
 const CWF = WF  - 2;  // chart width inside full-width card
 
-function DataTable({ columns, rows, maxRows = 8 }) {
+function DataTable({ title, columns, rows, maxRows = 8 }) {
   if (!rows || rows.length === 0) {
-    return <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', padding: '12px 0' }}>No data available</p>;
+    return (
+      <div data-pdf-block="true">
+        {title && <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</p>}
+        <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '12px 0' }}>No data available</p>
+      </div>
+    );
   }
   const displayRows = rows.slice(0, maxRows);
   return (
     <div data-pdf-block="true">
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+    {title && <p style={{ fontSize: 13, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{title}</p>}
+    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
       <thead>
         <tr style={{ background: '#f9fafb' }}>
           {columns.map(col => (
-            <th key={col} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>
+            <th key={col} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>
               {col}
             </th>
           ))}
@@ -223,71 +320,111 @@ function DataTable({ columns, rows, maxRows = 8 }) {
 }
 
 function NoData() {
-  return <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', padding: '20px 0' }}>No data available</p>;
+  return <p style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '20px 0' }}>No data available</p>;
 }
 
 // ── Section 1: Cover Page ─────────────────────────────────────────────────────
+const REPORT_INDEX = [
+  { number: '1', title: 'Checkpoint Harmony — Email & Cloud Security', color: '#2563eb' },
+  {
+    number: '2', title: 'SentinelOne', color: '#ef4444',
+    children: [
+      { label: '2.1', title: 'Threat Analytics' },
+      { label: '2.2', title: 'Agent Analytics' },
+      { label: '2.3', title: 'Most At-Risk Entities' },
+      { label: '2.4', title: 'Application CVEs' },
+      { label: '2.5', title: 'Application Insights — Installed Applications' },
+    ],
+  },
+  { number: '3', title: 'Zoho Desk — Support Tickets', color: '#f59e0b' },
+  { number: '4', title: 'Palo Alto Firewall — Network Security', color: '#f97316' },
+  { number: '5', title: 'Weekly Insights — 7-Day Comparison', color: '#7c3aed' },
+];
+
 function CoverPage({ orgName, generatedAt, groups }) {
   const dateStr = new Date(generatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   return (
-    <div style={{ background: '#1e1b4b', minHeight: 400, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 40px', textAlign: 'center', borderRadius: 0 }}>
-      {/* Shield icon */}
-      <div style={{ width: 72, height: 72, background: '#4f46e5', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-        </svg>
-      </div>
-      <h1 style={{ margin: '0 0 8px', fontSize: 32, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>CISO Security Report</h1>
-      <p style={{ margin: '0 0 32px', fontSize: 17, color: '#a5b4fc' }}>{orgName}</p>
-      <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '12px 24px' }}>
-        <p style={{ margin: 0, fontSize: 14, color: '#c7d2fe' }}>{dateStr}</p>
-      </div>
-      {/* {groups && groups.length > 0 && (
-        <div style={{ marginTop: 24, background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '10px 20px', maxWidth: 700 }}>
-          <p style={{ margin: '0 0 6px', fontSize: 11, color: '#818cf8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Report Scope — Groups Covered</p>
-          <p style={{ margin: 0, fontSize: 13, color: '#c7d2fe', lineHeight: 1.6 }}>{groups.join(' · ')}</p>
+    <div style={{ background: '#1e1b4b', height: 976, display: 'flex', flexDirection: 'column', borderRadius: 0, overflow: 'hidden' }}>
+      {/* Top accent */}
+      <div style={{ height: 5, background: '#4f46e5', flexShrink: 0 }} />
+
+      {/* Hero area */}
+      <div style={{ flex: '0 0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '48px 80px 32px', textAlign: 'center' }}>
+        <div style={{ width: 80, height: 80, background: 'rgba(255,255,255,0.08)', border: '1px dashed #6366f1', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 28 }}>
+          <span style={{ fontSize: 12, color: '#a5b4fc', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Logo</span>
         </div>
-      )} */}
-      <div style={{ marginTop: 32, display: 'flex', gap: 24 }}>
-        {['Checkpoint Harmony', 'SentinelOne', 'Palo Alto Firewall'].map(t => (
-          <div key={t} style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 8, padding: '8px 16px' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#a5b4fc', fontWeight: 600 }}>{t}</p>
+        <h1 style={{ margin: '0 0 10px', fontSize: 40, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em' }}>CISO Security Report</h1>
+        <p style={{ margin: '0 0 20px', fontSize: 20, color: '#a5b4fc' }}>{orgName}</p>
+        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 28px' }}>
+          <p style={{ margin: 0, fontSize: 16, color: '#c7d2fe' }}>{dateStr}</p>
+        </div>
+      </div>
+
+      {/* Index — fills remaining space */}
+      <div style={{ flex: 1, padding: '0 80px 48px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: '24px 32px', flex: 1 }}>
+          <p style={{ margin: '0 0 18px', fontSize: 14, color: '#818cf8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>Report Index</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            {REPORT_INDEX.map(({ number, title, color, children }) => (
+              <div key={number}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: 6, background: color, color: '#fff', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{number}</span>
+                  <span style={{ fontSize: 16, color: '#e0e7ff', fontWeight: 600 }}>{title}</span>
+                </div>
+                {children && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 32px', marginTop: 8, marginLeft: 38 }}>
+                    {children.map(({ label, title: childTitle }) => (
+                      <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, width: 'calc(50% - 16px)' }}>
+                        <span style={{ fontSize: 13, color: '#818cf8', fontWeight: 700, flexShrink: 0, minWidth: 24 }}>{label}</span>
+                        <span style={{ fontSize: 14, color: '#c7d2fe' }}>{childTitle}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{ height: 44, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.07)', display: 'flex', alignItems: 'center', padding: '0 80px', justifyContent: 'space-between' }}>
+        <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.22)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>CISO Security Report</p>
+        <div style={{ height: 2, width: 140, background: 'linear-gradient(to right, #4f46e5, transparent)', borderRadius: 2 }} />
       </div>
     </div>
   );
 }
 
 // ── Section 2: Executive Summary ──────────────────────────────────────────────
-function ExecutiveSummary({ s1Threats, s1Agents, harmonyEvents }) {
-  const totalThreats   = Array.isArray(s1Threats) ? s1Threats.length : 0;
-  const activeAgents   = Array.isArray(s1Agents)  ? s1Agents.filter(a => String(a.network_status || a.networkStatus || '').toLowerCase() === 'connected').length : 0;
-  const totalAgents    = Array.isArray(s1Agents)  ? s1Agents.length : 0;
-  const cpEvents       = Array.isArray(harmonyEvents) ? harmonyEvents.length : 0;
-  const criticalThreats = Array.isArray(s1Threats) ? s1Threats.filter(t => String(t.severity || '').toLowerCase() === 'critical' || Number(t.classification_source_id) >= 4).length : 0;
+// function ExecutiveSummary({ s1Threats, s1Agents, harmonyEvents }) {
+//   const totalThreats   = Array.isArray(s1Threats) ? s1Threats.length : 0;
+//   const activeAgents   = Array.isArray(s1Agents)  ? s1Agents.filter(a => String(a.network_status || a.networkStatus || '').toLowerCase() === 'connected').length : 0;
+//   const totalAgents    = Array.isArray(s1Agents)  ? s1Agents.length : 0;
+//   const cpEvents       = Array.isArray(harmonyEvents) ? harmonyEvents.length : 0;
+//   const criticalThreats = Array.isArray(s1Threats) ? s1Threats.filter(t => String(t.severity || '').toLowerCase() === 'critical' || Number(t.classification_source_id) >= 4).length : 0;
 
-  return (
-    <div style={{ padding: '24px 32px', background: '#fff' }}>
-      <SectionHeader number="1" title="Executive Summary" color="#4f46e5" />
-      <KpiRow>
-        <KpiCard label="Total Threats" value={totalThreats} sub="SentinelOne detections" color="#ef4444" />
-        <KpiCard label="Critical Threats" value={criticalThreats} sub="High severity" color="#f97316" />
-        <KpiCard label="Active Agents" value={`${activeAgents}/${totalAgents}`} sub="Endpoints connected" color="#10b981" />
-        <KpiCard label="Harmony Events" value={cpEvents} sub="Checkpoint detections" color="#4f46e5" />
-      </KpiRow>
-      <div data-pdf-block="true" style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px' }}>
-        <p style={{ margin: 0, fontSize: 13, color: '#166534' }}>
-          <strong>Report Period:</strong> This report covers all security events currently synced to the CISO Dashboard across all integrated platforms.
-          {totalThreats === 0 && cpEvents === 0 ? ' No threats detected across all platforms.' : ` ${totalThreats} endpoint threat${totalThreats !== 1 ? 's' : ''} and ${cpEvents} email security event${cpEvents !== 1 ? 's' : ''} detected.`}
-        </p>
-      </div>
-    </div>
-  );
-}
+//   return (
+//     <div style={{ padding: '24px 32px', background: '#fff' }}>
+//       <SectionHeader number="1" title="Executive Summary" color="#4f46e5" />
+//       <KpiRow>
+//         <KpiCard label="Total Threats" value={totalThreats} sub="SentinelOne detections" color="#ef4444" />
+//         <KpiCard label="Critical Threats" value={criticalThreats} sub="High severity" color="#f97316" />
+//         <KpiCard label="Active Agents" value={`${activeAgents}/${totalAgents}`} sub="Endpoints connected" color="#10b981" />
+//         <KpiCard label="Harmony Events" value={cpEvents} sub="Checkpoint detections" color="#4f46e5" />
+//       </KpiRow>
+//       <div data-pdf-block="true" style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 16px' }}>
+//         <p style={{ margin: 0, fontSize: 14, color: '#166534' }}>
+//           <strong>Report Period:</strong> This report covers all security events currently synced to the CISO Dashboard across all integrated platforms.
+//           {totalThreats === 0 && cpEvents === 0 ? ' No threats detected across all platforms.' : ` ${totalThreats} endpoint threat${totalThreats !== 1 ? 's' : ''} and ${cpEvents} email security event${cpEvents !== 1 ? 's' : ''} detected.`}
+//         </p>
+//       </div>
+//     </div>
+//   );
+// }
 
 // ── Section 3: Checkpoint Harmony ────────────────────────────────────────────
-function CheckpointSection({ harmonyEvents }) {
+function CheckpointSection({ harmonyEvents, weeklyStats }) {
   const events = Array.isArray(harmonyEvents) ? harmonyEvents : [];
 
   const severityData = useMemo(() => {
@@ -309,9 +446,10 @@ function CheckpointSection({ harmonyEvents }) {
   }, [events]);
 
   return (
+    <>
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="2" title="Checkpoint Harmony — Email & Cloud Security" color="#2563eb">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {events.length} email and cloud security events were recorded across {new Set(events.map(e => e.type).filter(Boolean)).size || 0} distinct event type{new Set(events.map(e => e.type).filter(Boolean)).size !== 1 ? 's' : ''}.{' '}
           {events.filter(e => e.state === 'pending').length} event{events.filter(e => e.state === 'pending').length !== 1 ? 's are' : ' is'} pending action; {events.filter(e => ['remediated','done','closed'].includes(e.state)).length} have been resolved.{' '}
           The table below shows the most recent detections — review pending items and confirm remediation actions are complete.
@@ -323,46 +461,44 @@ function CheckpointSection({ harmonyEvents }) {
         <KpiCard label="Remediated" value={events.filter(e => ['remediated','done','closed'].includes(e.state)).length} sub="Resolved events" color="#10b981" />
       </KpiRow>
 
-      {/* {events.length === 0 ? <NoData /> : (
-        // <div style={{ display: 'flex', gap: 12 }}>
-        //   <ChartCard title="Severity Distribution">
-        //     <PieChart width={230} height={200}>
-        //       <Pie data={severityData} cx={110} cy={90} innerRadius={50} outerRadius={78} dataKey="value">
-        //         {severityData.map((_, i) => <Cell key={i} fill={SEV_COLORS[i % SEV_COLORS.length]} />)}
-        //       </Pie>
-        //       <Tooltip contentStyle={TT_STYLE} />
-        //       <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-        //     </PieChart>
-        //   </ChartCard>
+      {events.length > 0 && (
+        <ChartRow mb={16}>
+          <ChartCard title="Severity Distribution" w={W3}>
+            <PdfPieChart
+              width={CW3} height={200}
+              data={severityData.map((d, i) => ({
+                ...d,
+                name: d.name === '3' ? 'High' : d.name === '4' ? 'Critical' : d.name,
+                fill: SEV_COLORS[i % SEV_COLORS.length],
+              }))}
+            />
+          </ChartCard>
 
-        //   <ChartCard title="Event State Breakdown">
-        //     <PieChart width={230} height={200}>
-        //       <Pie data={stateData} cx={110} cy={90} innerRadius={50} outerRadius={78} dataKey="value">
-        //         {stateData.map((d, i) => <Cell key={i} fill={STATE_COLORS[d.name] ?? COLORS[i % COLORS.length]} />)}
-        //       </Pie>
-        //       <Tooltip contentStyle={TT_STYLE} />
-        //       <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-        //     </PieChart>
-        //   </ChartCard>
+          <ChartCard title="Event State Breakdown" w={W3}>
+            <PdfPieChart
+              width={CW3} height={200}
+              data={stateData.map((d, i) => ({ ...d, fill: STATE_COLORS[d.name] ?? COLORS[i % COLORS.length] }))}
+            />
+          </ChartCard>
 
-        //   <ChartCard title="Top Event Types">
-        //     {typeData.length === 0 ? <NoData /> : (
-        //       <BarChart width={230} height={200} data={typeData} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
-        //         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        //         <XAxis type="number" tick={{ fontSize: 10 }} />
-        //         <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={90} />
-        //         <Tooltip contentStyle={TT_STYLE} />
-        //         <Bar dataKey="value" fill="#3b82f6" radius={[0,3,3,0]} />
-        //       </BarChart>
-        //     )}
-        //   </ChartCard>
-        // </div>
-      )} */}
+          <ChartCard title="Top Event Types" w={W3}>
+            {typeData.length === 0 ? <NoData /> : (
+              <BarChart width={CW3} height={200} data={typeData} layout="vertical" margin={{ left: 4, right: 16, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis type="number" tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
+                <Tooltip contentStyle={TT_STYLE} />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0,3,3,0]} />
+              </BarChart>
+            )}
+          </ChartCard>
+        </ChartRow>
+      )}
 
       {events.length > 0 && (
         <div data-pdf-block="true" style={{ marginTop: 16 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Recent Events (Top 10)</p>
           <DataTable
+            title="Recent Events (Top 10)"
             columns={['type', 'state', 'severity', 'description', 'sender_address']}
             rows={events.slice(0, 10).map(e => ({
               type: e.type || '-',
@@ -374,8 +510,101 @@ function CheckpointSection({ harmonyEvents }) {
           />
         </div>
       )}
+
     </div>
+
+    {weeklyStats && events.length > 0 && (
+      <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
+        <SectionHeader number="2W" title="Checkpoint Harmony — Week-over-Week Analysis" color="#2563eb">
+          <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+            Week-over-week comparison for Checkpoint Harmony events.{' '}
+            {weeklyStats.kpi.harmonyThis} event{weeklyStats.kpi.harmonyThis !== 1 ? 's' : ''} recorded this period
+            vs {weeklyStats.kpi.harmonyLast} the prior week.{' '}
+            Remediation rate: {weeklyStats.kpi.remRateThis}%{weeklyStats.kpi.remRateLast > 0 ? ` (was ${weeklyStats.kpi.remRateLast}% last week)` : ''}.
+          </p>
+        </SectionHeader>
+
+        <div data-pdf-block="true" style={{ background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '8px 14px', marginBottom: 20 }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#1d4ed8' }}>
+            <strong>Period:</strong> {weeklyStats.periodLabel} &nbsp;·&nbsp; Compared against the preceding 7 days.
+          </p>
+        </div>
+
+        <KpiRow mb={16}>
+          <WowKpiCard label="Harmony Events"        thisWeek={weeklyStats.kpi.harmonyThis} lastWeek={weeklyStats.kpi.harmonyLast} higherIsBetter={false} />
+          <WowKpiCard label="Remediation Rate"       thisWeek={weeklyStats.kpi.remRateThis} lastWeek={weeklyStats.kpi.remRateLast} unit="%" higherIsBetter={true} />
+          <WowKpiCard label="Critical / High Events" thisWeek={weeklyStats.kpi.critThis}    lastWeek={weeklyStats.kpi.critLast}    higherIsBetter={false} />
+        </KpiRow>
+
+        <ChartRow>
+          <ChartCard title="14-Day Harmony Event Trend (by Type)" w={W2}>
+            {weeklyStats.eventTypes.length === 0 ? <NoData /> : (
+              <BarChart width={CW2} height={240} data={weeklyStats.trend14dEvents} margin={{ left: 4, right: 8, top: 8, bottom: 30 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip contentStyle={TT_STYLE} />
+                <Legend iconSize={9} wrapperStyle={{ fontSize: 12 }} />
+                {weeklyStats.eventTypes.map((type, i) => (
+                  <Bar key={type} dataKey={type} stackId="a"
+                    fill={EVENT_TYPE_COLORS_RPT[type] ?? FALLBACK_COLORS_RPT[i % FALLBACK_COLORS_RPT.length]}
+                    name={type.replace(/_/g, ' ')} />
+                ))}
+              </BarChart>
+            )}
+          </ChartCard>
+
+          <ChartCard title="Daily Event Volume — This Week vs Last Week" w={W2}>
+            <BarChart width={CW2} height={240} data={weeklyStats.remComp} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="day" tick={{ fontSize: 13 }} />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+              <Tooltip contentStyle={TT_STYLE} />
+              <Legend iconSize={9} wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="This Week" fill="#6366f1" radius={[3,3,0,0]} maxBarSize={26} />
+              <Bar dataKey="Last Week" fill="#a5b4fc" radius={[3,3,0,0]} maxBarSize={26} />
+            </BarChart>
+          </ChartCard>
+        </ChartRow>
+
+        {weeklyStats.severityShift.length > 0 && (
+          <div data-pdf-block="true" style={{ marginBottom: 16 }}>
+            <ChartCard title="Severity Distribution Shift" w={WF}>
+              <BarChart width={CWF} height={200} data={weeklyStats.severityShift} margin={{ left: 16, right: 24, top: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="severity" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <Tooltip contentStyle={TT_STYLE} />
+                <Legend iconSize={9} wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="thisWeek" fill="#6366f1" radius={[3,3,0,0]} maxBarSize={50} name="This Week" />
+                <Bar dataKey="lastWeek" fill="#a5b4fc" radius={[3,3,0,0]} maxBarSize={50} name="Last Week" />
+              </BarChart>
+            </ChartCard>
+          </div>
+        )}
+
+        {weeklyStats.topSenders.length > 0 && (
+          <div data-pdf-block="true">
+            <DataTable
+              title="Top Senders — Week-over-Week"
+              columns={['sender_address', 'This Week', 'Last Week', 'Change']}
+              rows={weeklyStats.topSenders}
+              maxRows={10}
+            />
+          </div>
+        )}
+      </div>
+    )}
+    </>
   );
+}
+
+function formatDuration(minutes) {
+  if (!minutes || minutes < 1) return '<1m';
+  if (minutes < 60) return `${Math.round(minutes)}m`;
+  if (minutes < 1440) { const h = Math.floor(minutes / 60), m = Math.round(minutes % 60); return m > 0 ? `${h}h ${m}m` : `${h}h`; }
+  const d = Math.floor(minutes / 1440), h = Math.round((minutes % 1440) / 60);
+  return h > 0 ? `${d}d ${h}h` : `${d}d`;
 }
 
 // ── Section 4: SentinelOne Threats ────────────────────────────────────────────
@@ -412,7 +641,7 @@ function S1ThreatsSection({ s1Threats }) {
       const s = t.threatInfo?.confidenceLevel || t.threatInfo?.classification || 'Unknown';
       counts[s] = (counts[s] || 0) + 1;
     });
-    return Object.entries(counts).map(([name, value], i) => ({ name, value, fill: SEV_COLORS[i % SEV_COLORS.length] }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value, fill: SEV_COLORS[i % SEV_COLORS.length] }));
   }, [threats]);
 
   const engineData = useMemo(() => {
@@ -424,7 +653,7 @@ function S1ThreatsSection({ s1Threats }) {
       });
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10)
-      .map(([name, value]) => ({ name: name.length > 30 ? name.slice(0, 30) + '…' : name, value })).reverse();
+      .map(([name, value]) => ({ name: name.length > 30 ? name.slice(0, 30) + '…' : name, value }));
   }, [threats]);
 
   const tacticData = useMemo(() => {
@@ -437,7 +666,17 @@ function S1ThreatsSection({ s1Threats }) {
       });
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 12)
-      .map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, value })).reverse();
+      .map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, value }));
+  }, [threats]);
+
+  const siteData = useMemo(() => {
+    const counts = {};
+    threats.forEach(t => {
+      const k = t.agentRealtimeInfo?.siteName || 'Unknown';
+      counts[k] = (counts[k] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10)
+      .map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, value }));
   }, [threats]);
 
   const mitigRateByClass = useMemo(() => {
@@ -490,7 +729,7 @@ function S1ThreatsSection({ s1Threats }) {
         { name: 'Manual Mitigated', value: manual, fill: '#3b82f6' },
         { name: 'Not Mitigated',    value: none,   fill: '#ef4444' },
         { name: 'Marked Benign',    value: benign, fill: '#64748b' },
-      ].filter(d => d.value > 0),
+      ].filter(d => d.value > 0).sort((a, b) => b.value - a.value),
     };
   }, [threats]);
 
@@ -504,21 +743,50 @@ function S1ThreatsSection({ s1Threats }) {
   const notMitigatedCount = threats.filter(t => ['not_mitigated', 'unmitigated', 'active'].includes(t.threatInfo?.mitigationStatus)).length;
   const benignCount       = threats.filter(t => t.threatInfo?.mitigationStatus === 'marked_as_benign').length;
 
+  const filelessData = useMemo(() => {
+    const f = threats.filter(t => t.threatInfo?.isFileless).length;
+    return [
+      { name: 'File-based', value: threats.length - f, fill: '#3b82f6' },
+      { name: 'Fileless',   value: f,                  fill: '#ef4444' },
+    ];
+  }, [threats]);
+
+  const { avgMttd, avgMttm } = useMemo(() => {
+    let mttdSum = 0, mttdCount = 0, mttmSum = 0, mttmCount = 0;
+    threats.forEach(t => {
+      const created    = t.threatInfo?.createdAt    ? new Date(t.threatInfo.createdAt)    : null;
+      const identified = t.threatInfo?.identifiedAt ? new Date(t.threatInfo.identifiedAt) : null;
+      if (created && identified && !isNaN(created) && !isNaN(identified)) {
+        mttdSum += Math.abs(created - identified) / 60000; mttdCount++;
+      }
+      const successEntry = (t.mitigationStatus || []).find(s => s.status === 'success');
+      if (successEntry && identified) {
+        const ended = successEntry.mitigationEndedAt ? new Date(successEntry.mitigationEndedAt) : null;
+        if (ended && !isNaN(ended)) { mttmSum += (ended - identified) / 60000; mttmCount++; }
+      }
+    });
+    return {
+      avgMttd: mttdCount > 0 ? mttdSum / mttdCount : null,
+      avgMttm: mttmCount > 0 ? mttmSum / mttmCount : null,
+    };
+  }, [threats]);
+
   // Chart descriptions
   const mitPct    = threats.length > 0 ? Math.round(mitigated / threats.length * 100) : 0;
   const topMit    = mitigationData[0];
   const topClass  = classData[0];
   const topConf   = [...confidenceData].sort((a, b) => b.value - a.value)[0];
-  const topEngine = engineData[engineData.length - 1];
-  const topTactic = tacticData[tacticData.length - 1];
+  const topEngine = engineData[0];
+  const topTactic = tacticData[0];
   const lowestMitClass = mitigRateByClass.length > 0
     ? mitigRateByClass.reduce((a, b) => a.rate < b.rate ? a : b)
     : null;
 
   return (
+    <>
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="3" title="SentinelOne — Threat Analytics" color="#ef4444">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {threats.length} threat{threats.length !== 1 ? 's' : ''} detected across monitored endpoints.{' '}
           {mitigated} ({threats.length > 0 ? Math.round(mitigated / threats.length * 100) : 0}%) have been mitigated
           {unresolved > 0 ? `; ${unresolved} remain active or unresolved and require follow-up` : ''}.{' '}
@@ -527,40 +795,25 @@ function S1ThreatsSection({ s1Threats }) {
         </p>
       </SectionHeader>
       <KpiRow>
-        <KpiCard label="Total Threats"      value={threats.length}   color="#ef4444" sub="since deployment" />
-        <KpiCard label="Mitigated"          value={mitigated}         color="#10b981" />
-        <KpiCard label="Unresolved"         value={unresolved}        color="#f59e0b" />
-        <KpiCard label="Affected Endpoints" value={affectedEndpoints} color="#6366f1" />
+        <KpiCard label="Total Threats" value={threats.length}   color="#ef4444" sub="since deployment" />
+        <KpiCard label="Mitigated"     value={mitigated}         color="#10b981" />
+        <KpiCard label="Unresolved"    value={unresolved}        color="#f59e0b" />
+        <KpiCard label="Avg MTTD"      value={avgMttd !== null ? formatDuration(avgMttd) : 'N/A'} color="#8b5cf6" sub="mean time to detect" />
+        <KpiCard label="Avg MTTM"      value={avgMttm !== null ? formatDuration(avgMttm) : 'N/A'} color="#06b6d4" sub="mean time to mitigate" />
       </KpiRow>
-
-      <div data-pdf-block="true" style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        {[
-          { label: 'Mitigated',        count: mitigatedCount,    color: '#10b981', def: 'Threat was successfully contained and neutralized by the platform or an analyst.' },
-          { label: 'Not Mitigated',    count: notMitigatedCount, color: '#ef4444', def: 'Threat remains active on the endpoint and requires immediate response.' },
-          { label: 'Marked as Benign', count: benignCount,       color: '#64748b', def: 'Threat was reviewed and determined to be non-malicious; no action required.' },
-        ].map(({ label, count, color, def }) => (
-          <div key={label} style={{ flex: '1 1 0', border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`, borderRadius: 8, padding: '12px 16px', background: '#f8fafc' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#374151' }}>{label}</span>
-              <span style={{ fontSize: 22, fontWeight: 800, color }}>{count}</span>
-            </div>
-            <p style={{ margin: 0, fontSize: 11, color: '#6b7280', lineHeight: 1.5 }}>{def}</p>
-          </div>
-        ))}
-      </div>
 
       {threats.length === 0 ? <NoData /> : (
         <ChartRow mb={16}>
           <ChartCard title="Mitigation Status" w={W3}
-            description={topMit ? `"${topMit.name}" is the most common status with ${topMit.value} threat${topMit.value !== 1 ? 's' : ''}. Overall, ${mitigated} of ${threats.length} threats (${mitPct}%) have been mitigated.` : undefined}>
+            description={topMit ? `"${topMit.name}" is the most common status with ${topMit.value} threat${topMit.value !== 1 ? 's' : ''}. Overall, ${mitigated} of ${threats.length} threats (${mitPct}%) have been mitigated. Mitigated: contained and neutralized. Not Mitigated: still active, requires response. Marked as Benign: reviewed and deemed non-malicious.` : 'Mitigated: contained and neutralized. Not Mitigated: still active, requires response. Marked as Benign: reviewed and deemed non-malicious.'}>
             {mitigationData.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={280} data={mitigationData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={115} />
+                <XAxis type="number" tick={{ fontSize: 13 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={115} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill="#ef4444" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
@@ -570,12 +823,12 @@ function S1ThreatsSection({ s1Threats }) {
             description={topConf ? `Most threats are identified as "${topConf.name}" (${topConf.value}). Confidence reflects detection certainty — high-confidence detections warrant immediate investigation.` : undefined}>
             <BarChart width={CW3} height={240} data={confidenceData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} tickLine={false} axisLine={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TT_STYLE} />
               <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Threats">
                 {confidenceData.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ChartCard>
@@ -585,11 +838,11 @@ function S1ThreatsSection({ s1Threats }) {
             {classData.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={280} data={classData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 12 }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={115} />
+                <XAxis type="number" tick={{ fontSize: 13 }} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={115} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill="#f97316" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
@@ -599,43 +852,43 @@ function S1ThreatsSection({ s1Threats }) {
 
       {threats.length > 0 && (
         <ChartRow mb={16}>
-          <ChartCard title="Detection Engine Breakdown" w={W3}>
+          <ChartCard title="Detection Engine Breakdown" w={W3} compact>
             {engineData.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={260} data={engineData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={115} />
+                <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={115} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill="#6366f1" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
           </ChartCard>
 
-          <ChartCard title="MITRE ATT&CK Tactics" w={W3}>
+          <ChartCard title="MITRE ATT&CK Tactics" w={W3} compact>
             {tacticData.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={260} data={tacticData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={110} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill="#8b5cf6" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
           </ChartCard>
 
-          <ChartCard title="Incident Status" w={W3}>
+          <ChartCard title="Incident Status" w={W3} compact>
             {incidentStatusData.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={260} data={incidentStatusData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={85} />
+                <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={85} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill="#f59e0b" radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
@@ -643,16 +896,65 @@ function S1ThreatsSection({ s1Threats }) {
         </ChartRow>
       )}
 
+      {threats.length > 0 && (
+        <ChartRow mb={16}>
+          <ChartCard
+            title="Fileless vs File-based"
+            w={W2}
+            description={`${filelessData[1]?.value ?? 0} fileless threat${(filelessData[1]?.value ?? 0) !== 1 ? "s" : ""} detected. Fileless attacks execute in-memory and evade traditional file scanning.`}
+          >
+            <BarChart
+              width={CW2}
+              height={180}
+              data={filelessData}
+              layout="vertical"
+              margin={{ left: 4, right: 36, top: 8, bottom: 8 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} />
+              <Tooltip contentStyle={TT_STYLE} />
+              <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={40}>
+                {filelessData.map((d, i) => (
+                  <Cell key={i} fill={d.fill} />
+                ))}
+                <LabelList
+                  dataKey="value"
+                  position="right"
+                  style={{ fontSize: 12, fill: "#374151", fontWeight: 600 }}
+                />
+              </Bar>
+            </BarChart>
+          </ChartCard>
+        </ChartRow>
+      )}
+
+      {siteData.length > 0 && (
+        <div data-pdf-section="true" style={{ marginBottom: 16 }}>
+          <ChartCard title="Threats by Site" w={WF} compact>
+            <BarChart width={CWF} height={220} data={siteData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={140} />
+              <Tooltip contentStyle={TT_STYLE} />
+              <Bar dataKey="value" fill="#10b981" radius={[0, 3, 3, 0]}>
+                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
+              </Bar>
+            </BarChart>
+          </ChartCard>
+        </div>
+      )}
+
       {mitigRateByClass.length > 0 && (
         <div data-pdf-block="true" style={{ marginBottom: 16 }}>
           <ChartCard title="Mitigation Rate by Classification (%)" w={WF}>
             <BarChart width={CWF} height={200} data={mitigRateByClass} margin={{ left: 16, right: 24, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} tickFormatter={v => `${v}%`} />
+              <XAxis dataKey="name" tick={{ fontSize: 13 }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 13 }} tickFormatter={v => `${v}%`} />
               <Tooltip contentStyle={TT_STYLE} formatter={(v, name) => name === 'rate' ? [`${v}%`, 'Mitigation Rate'] : [v, name]} />
               <Bar dataKey="rate" name="Mitigation Rate %" fill="#10b981" radius={[3, 3, 0, 0]} maxBarSize={50}>
-                <LabelList dataKey="rate" position="top" formatter={v => `${v}%`} style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="rate" position="top" formatter={v => `${v}%`} style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ChartCard>
@@ -669,25 +971,29 @@ function S1ThreatsSection({ s1Threats }) {
             <KpiCard label="Not Mitigated"      value={mitigTypeData.none}   color="#ef4444" />
             {mitigTypeData.benign > 0 && <KpiCard label="Marked Benign" value={mitigTypeData.benign} color="#64748b" />}
           </KpiRow>
-          <ChartRow mb={16}>
+          {/* <ChartRow mb={16}>
             <ChartCard title="Mitigation Response Breakdown" w={W2}>
               <BarChart width={CW2} height={200} data={mitigTypeData.donut} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={120} tickLine={false} axisLine={false} />
+                <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={120} tickLine={false} axisLine={false} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Threats">
                   {mitigTypeData.donut.map((d, i) => <Cell key={i} fill={d.fill} />)}
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             </ChartCard>
-          </ChartRow>
+          </ChartRow> */}
         </>
       )}
 
-      {threats.length > 0 && (
+    </div>
+
+    {threats.length > 0 && (
+      <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff' }}>
         <DataTable
+          title="Recent Threats (Top 12)"
           columns={['Threat Name', 'Classification', 'Mitigation', 'Incident Status', 'Detected']}
           rows={threats.slice(0, 12).map(t => ({
             'Threat Name':     (t.threatInfo?.threatName || t.threatInfo?.threatFilePath || '-').slice(0, 40),
@@ -696,9 +1002,11 @@ function S1ThreatsSection({ s1Threats }) {
             'Incident Status': t.threatInfo?.incidentStatus   || '-',
             'Detected':        t.threatInfo?.createdAt ? new Date(t.threatInfo.createdAt).toLocaleDateString() : '-',
           }))}
+          maxRows={12}
         />
-      )}
-    </div>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -724,19 +1032,19 @@ function S1AgentsSection({ s1Agents, generatedAt, removedAgentsCount }) {
   const osData = useMemo(() => {
     const counts = {};
     agents.forEach(a => { const s = a.os_type || a.osType || a.os || 'Unknown'; counts[s] = (counts[s]||0)+1; });
-    return Object.entries(counts).map(([name,value]) => ({ name, value }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name,value]) => ({ name, value }));
   }, [agents]);
 
   const machineTypeData = useMemo(() => {
     const counts = {};
     agents.forEach(a => { const s = a.machineType || a.machine_type || 'Unknown'; counts[s] = (counts[s]||0)+1; });
-    return Object.entries(counts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
   }, [agents]);
 
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="4" title="SentinelOne — Agent Analytics" color="#10b981">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {agents.length} SentinelOne agent{agents.length !== 1 ? 's' : ''} registered across the fleet.{' '}
           {agents.filter(a => String(a.network_status || a.networkStatus || '').toLowerCase() === 'connected').length} ({agents.length > 0 ? Math.round(agents.filter(a => String(a.network_status || a.networkStatus || '').toLowerCase() === 'connected').length / agents.length * 100) : 0}%) are currently online and receiving real-time protection.{' '}
           {agents.filter(a => String(a.network_status || a.networkStatus || '').toLowerCase() === 'disconnected').length > 0
@@ -759,12 +1067,12 @@ function S1AgentsSection({ s1Agents, generatedAt, removedAgentsCount }) {
           {/* <ChartCard title="Agent Network Status" w={W2}>
             <BarChart width={CW2} height={200} data={statusData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} tickLine={false} axisLine={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={100} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TT_STYLE} />
               <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Agents">
                 {statusData.map((d, i) => <Cell key={i} fill={d.name==='connected'?'#22c55e':d.name==='disconnected'?'#ef4444':COLORS[i%COLORS.length]} />)}
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ChartCard> */}
@@ -772,12 +1080,12 @@ function S1AgentsSection({ s1Agents, generatedAt, removedAgentsCount }) {
           <ChartCard title="OS Distribution" w={W2}>
             <BarChart width={CW2} height={200} data={osData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} tickLine={false} axisLine={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={100} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TT_STYLE} />
               <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Agents">
                 {osData.map((_, i) => <Cell key={i} fill={COLORS[i%COLORS.length]} />)}
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ChartCard>
@@ -789,23 +1097,23 @@ function S1AgentsSection({ s1Agents, generatedAt, removedAgentsCount }) {
           <ChartCard title="Fleet Composition by Machine Type" w={W2}>
             <BarChart width={CW2} height={220} data={machineTypeData} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-              <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} tickLine={false} axisLine={false} />
+              <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} tickLine={false} axisLine={false} />
               <Tooltip contentStyle={TT_STYLE} />
               <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Agents">
                 {machineTypeData.map((d, i) => <Cell key={i} fill={d.fill} />)}
-                <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           </ChartCard>
 
           <ChartCard title="Machine Type Breakdown" w={W2}>
             <div style={{ padding: '12px 16px' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                 <thead>
                   <tr style={{ background: '#f9fafb' }}>
                     {['Type', 'Count', 'Share'].map(col => (
-                      <th key={col} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>{col}</th>
+                      <th key={col} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.04em', borderBottom: '1px solid #e5e7eb' }}>{col}</th>
                     ))}
                   </tr>
                 </thead>
@@ -828,13 +1136,14 @@ function S1AgentsSection({ s1Agents, generatedAt, removedAgentsCount }) {
 
       {agents.length > 0 && (
         <DataTable
+          title="Agent Details (Top 10)"
           columns={['computer_name', 'os_type', 'network_status', 'agent_version', 'last_active_date']}
           rows={agents.slice(0, 10).map(a => ({
             computer_name: a.computer_name || a.computerName || '-',
             os_type: a.os_type || a.osType || a.os || '-',
             network_status: a.network_status || a.networkStatus || '-',
             agent_version: a.agent_version || a.agentVersion || '-',
-            last_active_date: a.last_active_date ? new Date(a.last_active_date).toLocaleDateString() : '-',
+            last_active_date: (() => { const v = a.lastActiveDate || a.last_active_date || a.lastSeen; return v ? new Date(v).toLocaleDateString() : '-'; })(),
           }))}
         />
       )}
@@ -857,7 +1166,7 @@ function MostAtRiskSection({ s1Threats }) {
       if (grp) byGroup[grp]  = (byGroup[grp]  || 0) + 1;
     });
     const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1]);
-    const toChart = (entries) => entries.slice(0, 5).map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, value })).reverse();
+    const toChart = (entries) => entries.slice(0, 5).map(([name, value]) => ({ name: name.length > 22 ? name.slice(0, 22) + '…' : name, value }));
     const devEntries = top(byDevice), usrEntries = top(byUser), grpEntries = top(byGroup);
     return {
       topDevices: toChart(devEntries),
@@ -880,7 +1189,7 @@ function MostAtRiskSection({ s1Threats }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="5" title="Most At-Risk Entities" color="#f97316">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           Entities most frequently targeted by threats during the report period. Rankings are derived from the total number of threat detections per device, user account, and organisational group.
         </p>
       </SectionHeader>
@@ -888,14 +1197,14 @@ function MostAtRiskSection({ s1Threats }) {
       <div data-pdf-block="true" style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
         {atRiskCards.map(({ label, entry, color }) => (
           <div key={label} style={{ flex: '1 1 0', border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`, borderRadius: 8, padding: '14px 16px', background: '#f8fafc' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{label}</div>
             {entry ? (
               <>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 2, wordBreak: 'break-all' }}>{entry[0]}</div>
-                <div style={{ fontSize: 13, color, fontWeight: 600 }}>{entry[1]} threat{entry[1] !== 1 ? 's' : ''}</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: '#111827', marginBottom: 2, wordBreak: 'break-all' }}>{entry[0]}</div>
+                <div style={{ fontSize: 14, color, fontWeight: 600 }}>{entry[1]} threat{entry[1] !== 1 ? 's' : ''}</div>
               </>
             ) : (
-              <div style={{ fontSize: 12, color: '#9ca3af' }}>No data</div>
+              <div style={{ fontSize: 13, color: '#9ca3af' }}>No data</div>
             )}
           </div>
         ))}
@@ -911,11 +1220,11 @@ function MostAtRiskSection({ s1Threats }) {
             {data.length === 0 ? <NoData /> : (
               <BarChart width={CW3} height={220} data={data} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={110} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" fill={color} radius={[0, 3, 3, 0]}>
-                  <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             )}
@@ -970,8 +1279,7 @@ function buildCveData(apps) {
     .map(([name, value]) => ({ name, value, fill: CVE_COLORS[name] }));
 
   const topRiskyApps = [...appList].sort((a, b) => b.cveCount - a.cveCount).slice(0, 10)
-    .map((a) => ({ name: shortName(a.name), fullName: a.name, cves: a.cveCount, score: a.highestNvdBaseScore }))
-    .reverse();
+    .map((a) => ({ name: shortName(a.name), fullName: a.name, cves: a.cveCount, score: a.highestNvdBaseScore }));
 
   const agingBuckets = { '0-30': 0, '31-90': 0, '91-180': 0, '180+': 0 };
   apps.forEach((r) => {
@@ -981,7 +1289,7 @@ function buildCveData(apps) {
   const cveAging = Object.entries(agingBuckets).map(([name, count]) => ({ name, count }));
 
   const endpointImpact = [...appList].sort((a, b) => b.endpointCount - a.endpointCount).slice(0, 10)
-    .map((a) => ({ name: shortName(a.name), endpoints: a.endpointCount })).reverse();
+    .map((a) => ({ name: shortName(a.name), endpoints: a.endpointCount }));
 
   const scoreRangeBuckets = [
     { name: 'Low (0-3.9)', fill: '#3b82f6', count: 0 },
@@ -998,14 +1306,14 @@ function buildCveData(apps) {
   const vendorCounts = {};
   apps.forEach((r) => { const v = r.applicationVendor || ''; if (v) vendorCounts[v] = (vendorCounts[v] || 0) + 1; });
   const vendorRisk = Object.entries(vendorCounts).sort((a, b) => b[1] - a[1]).slice(0, 10)
-    .map(([name, cves]) => ({ name: shortName(name), cves, fullName: name })).reverse();
+    .map(([name, cves]) => ({ name: shortName(name), cves, fullName: name }));
 
   const statusCounts = {};
   apps.forEach((r) => { const s = r.status || 'Unknown'; statusCounts[s] = (statusCounts[s] || 0) + 1; });
   const estimateStatus = Object.entries(statusCounts)
     .map(([name, value], i) => ({ name, value, fill: ['#f97316','#22c55e','#3b82f6','#a855f7'][i % 4] }));
 
-  const criticalApps = appList.filter((a) => a.highestSeverity === 'CRITICAL')
+  const criticalApps = appList.filter((a) => a.highestSeverity === 'CRITICAL' && a.name !== 'Microsoft Office Standard 2016')
     .sort((a, b) => b.cveCount - a.cveCount).slice(0, 6);
 
   return { totalApplications: appList.length, totalCves, totalEndpoints, avgScore, severityMap, severityDistribution, topRiskyApps, cveAging, endpointImpact, scoreRange, vendorRisk, estimateStatus, criticalApps };
@@ -1029,7 +1337,7 @@ function S1CveSection({ s1Cves }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="6" title="SentinelOne — Application CVEs" color="#8b5cf6">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {d.totalApplications} vulnerable application{d.totalApplications !== 1 ? 's' : ''} identified carrying {d.totalCves} CVE{d.totalCves !== 1 ? 's' : ''} across {d.totalEndpoints} endpoint{d.totalEndpoints !== 1 ? 's' : ''}, with an average CVSS base score of {d.avgScore}.{' '}
           {d.severityMap.CRITICAL > 0 ? `${d.severityMap.CRITICAL} application${d.severityMap.CRITICAL !== 1 ? 's carry' : ' carries'} CRITICAL-severity vulnerabilities and should be patched immediately.` : 'No critical-severity applications detected.'}{' '}
           {d.severityMap.HIGH > 0 ? `A further ${d.severityMap.HIGH} application${d.severityMap.HIGH !== 1 ? 's are' : ' is'} rated HIGH.` : ''}
@@ -1048,38 +1356,26 @@ function S1CveSection({ s1Cves }) {
       </KpiRow>
 
       {/* Row 1: Severity donut + Score range donut */}
-      {/* <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
-        <ChartCard title="Severity Distribution">
-          <PieChart width={355} height={220}>
-            <Pie data={d.severityDistribution} cx={175} cy={100} innerRadius={55} outerRadius={85} startAngle={90} endAngle={-270} dataKey="value">
-              {d.severityDistribution.map((e, i) => <Cell key={i} fill={e.fill} />)}
-            </Pie>
-            <Tooltip contentStyle={TT_STYLE} />
-            <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-          </PieChart>
-        </ChartCard> */}
+      <ChartRow mb={12}>
+        <ChartCard title="Severity Distribution" w={W2}>
+          <PdfPieChart width={CW2} height={220} data={d.severityDistribution} />
+        </ChartCard>
 
-        {/* <ChartCard title="Base Score Range">
-          <PieChart width={355} height={220}>
-            <Pie data={d.scoreRange} cx={175} cy={100} innerRadius={55} outerRadius={85} startAngle={90} endAngle={-270} dataKey="value">
-              {d.scoreRange.map((e, i) => <Cell key={i} fill={e.fill} />)}
-            </Pie>
-            <Tooltip contentStyle={TT_STYLE} />
-            <Legend iconType="circle" iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-          </PieChart>
-        </ChartCard> 
-      </div> */}
+        <ChartCard title="Base Score Range" w={W2}>
+          <PdfPieChart width={CW2} height={220} data={d.scoreRange} />
+        </ChartCard>
+      </ChartRow>
 
       {/* Row 2: Top risky apps + CVE aging */}
       <ChartRow>
         <ChartCard title="Top 10 Risky Applications (by CVE count)" w={W2}>
           <BarChart width={CW2} height={320} data={d.topRiskyApps} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={130} />
+            <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={130} />
             <Tooltip contentStyle={TT_STYLE} />
             <Bar dataKey="cves" fill="#ef4444" radius={[0,3,3,0]} maxBarSize={22} name="CVEs">
-              <LabelList dataKey="cves" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+              <LabelList dataKey="cves" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ChartCard>
@@ -1087,11 +1383,11 @@ function S1CveSection({ s1Cves }) {
         <ChartCard title="CVE Aging (Days Detected)" w={W2}>
           <BarChart width={CW2} height={320} data={d.cveAging} margin={{ left: 4, right: 16, top: 24, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="name" tick={{ fontSize: 13 }} />
-            <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 14 }} />
+            <YAxis tick={{ fontSize: 13 }} allowDecimals={false} />
             <Tooltip contentStyle={TT_STYLE} />
             <Bar dataKey="count" fill="#38bdf8" radius={[3,3,0,0]} maxBarSize={60} name="Apps">
-              <LabelList dataKey="count" position="top" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+              <LabelList dataKey="count" position="top" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ChartCard>
@@ -1102,11 +1398,11 @@ function S1CveSection({ s1Cves }) {
         <ChartCard title="Endpoint Impact (Top 10 Apps)" w={W2}>
           <BarChart width={CW2} height={320} data={d.endpointImpact} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={130} />
+            <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={130} />
             <Tooltip contentStyle={TT_STYLE} />
             <Bar dataKey="endpoints" fill="#22c55e" radius={[0,3,3,0]} maxBarSize={22} name="Endpoints">
-              <LabelList dataKey="endpoints" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+              <LabelList dataKey="endpoints" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
             </Bar>
           </BarChart>
         </ChartCard>
@@ -1115,11 +1411,11 @@ function S1CveSection({ s1Cves }) {
           {d.vendorRisk.length === 0 ? <NoData /> : (
             <BarChart width={CW2} height={320} data={d.vendorRisk} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-              <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={130} />
+              <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+              <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={130} />
               <Tooltip contentStyle={TT_STYLE} />
               <Bar dataKey="cves" fill="#f97316" radius={[0,3,3,0]} maxBarSize={22} name="CVEs">
-                <LabelList dataKey="cves" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                <LabelList dataKey="cves" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
               </Bar>
             </BarChart>
           )}
@@ -1128,15 +1424,9 @@ function S1CveSection({ s1Cves }) {
 
       {/* Row 4: Remediation status donut (full width) */}
       {/* {d.estimateStatus.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
+        <div data-pdf-block="true" style={{ marginBottom: 12 }}>
           <ChartCard title="Remediation Status" w={WF}>
-            <PieChart width={CWF} height={280}>
-              <Pie data={d.estimateStatus} cx={CWF/2} cy={115} innerRadius={70} outerRadius={110} startAngle={90} endAngle={-270} dataKey="value">
-                {d.estimateStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
-              </Pie>
-              <Tooltip contentStyle={TT_STYLE} />
-              <Legend iconType="circle" iconSize={11} wrapperStyle={{ fontSize: 12 }} />
-            </PieChart>
+            <PdfPieChart width={340} height={280} data={d.estimateStatus} />
           </ChartCard>
         </div>
       )} */}
@@ -1144,20 +1434,20 @@ function S1CveSection({ s1Cves }) {
       {/* CVE Exposure Funnel table */}
       {d.severityDistribution.length > 0 && (
         <div data-pdf-block="true" style={{ marginBottom: 16 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CVE Exposure Funnel</p>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>CVE Exposure Funnel</p>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#f9fafb' }}>
-                {['Severity', 'Unique CVEs', 'Affected Endpoints', 'Fleet Coverage %'].map(col => (
-                  <th key={col} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em', borderBottom: '2px solid #e5e7eb' }}>{col}</th>
+                {['Severity', 'Unique CVEs', 'Fleet Coverage %'].map(col => (
+                  <th key={col} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.04em', borderBottom: '2px solid #e5e7eb' }}>{col}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {d.severityDistribution.map((row, i) => {
-                const appsForSev = apps.filter(a => (a.highestSeverity || 'UNKNOWN').toUpperCase() === row.name.toUpperCase());
-                const cveCount = appsForSev.reduce((s, a) => s + (a.cveCount || (a.nvdData || []).length || 0), 0);
-                const epCount  = appsForSev.reduce((s, a) => s + (a.endpointCount || a.numberOfEndpointsWithApp || 0), 0);
+                const appsForSev = apps.filter(a => String(a.severity || 'UNKNOWN').toUpperCase() === row.name.toUpperCase());
+                const cveCount = new Set(appsForSev.map(a => a.cveId).filter(Boolean)).size || appsForSev.length;
+                const epCount  = new Set(appsForSev.map(a => a.endpointId || a.endpointName).filter(Boolean)).size;
                 const fleetPct = d.totalEndpoints > 0 ? Math.round((epCount / d.totalEndpoints) * 100) : 0;
                 return (
                   <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#f9fafb' }}>
@@ -1176,12 +1466,12 @@ function S1CveSection({ s1Cves }) {
       {/* Critical apps mini-cards */}
       {d.criticalApps.length > 0 && (
         <div data-pdf-block="true" style={{ marginTop: 4 }}>
-          <p style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Critical Applications</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Critical Applications</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {d.criticalApps.map((app, i) => (
-              <div key={i} style={{ flex: '1 1 200px', background: '#faf5ff', border: '1px solid #e9d5ff', borderLeft: '4px solid #a855f7', borderRadius: 8, padding: '10px 12px' }}>
-                <p style={{ margin: '0 0 8px', fontSize: 12, fontWeight: 700, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={app.name}>{app.name}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 11 }}>
+              <div key={i} style={{ flex: '1 1 0', minWidth: 0, background: '#faf5ff', border: '1px solid #e9d5ff', borderLeft: '4px solid #a855f7', borderRadius: 8, padding: '10px 12px' }}>
+                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={app.name}>{app.name}</p>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
                   <span style={{ color: '#6b7280' }}>Severity</span><span style={{ color: '#a855f7', fontWeight: 700 }}>{app.highestSeverity}</span>
                   <span style={{ color: '#6b7280' }}>CVEs</span><span style={{ fontWeight: 600 }}>{app.cveCount}</span>
                   <span style={{ color: '#6b7280' }}>Score</span><span style={{ fontWeight: 600 }}>{typeof app.highestNvdBaseScore === 'number' ? app.highestNvdBaseScore.toFixed(1) : app.highestNvdBaseScore}</span>
@@ -1200,34 +1490,35 @@ function S1CveSection({ s1Cves }) {
 function ApplicationInsightsSection({ s1AppAgent }) {
   const apps = Array.isArray(s1AppAgent) ? s1AppAgent : [];
 
-  const { totalApps, uniquePublishers, byOs, bySignedStatus, topApps } = useMemo(() => {
+  const { totalApps, uniquePublishers, byOs, bySeverity, topApps } = useMemo(() => {
     const appNames    = new Set();
     const publishers  = new Set();
     const osCounts    = {};
-    const signedCount = {};
+    const sevCounts   = {};
 
     apps.forEach(a => {
-      const name      = a.name      || a.appName      || a.applicationName || 'Unknown';
-      const pub       = a.publisher || a.vendor        || a.publisherName   || '';
-      const os        = a.osType    || a.os            || a.operatingSystem || 'Unknown';
-      const signed    = a.signedStatus || (a.isSigned ? 'signed' : 'unsigned') || 'unknown';
+      const name = a.applicationName || a.name    || a.appName || 'Unknown';
+      const pub  = a.applicationVendor || a.publisher || a.vendor || '';
+      const os   = a.osType || a.os || a.operatingSystem || 'Unknown';
+      const sev  = String(a.severity || 'Unknown');
 
       appNames.add(name);
       if (pub) publishers.add(pub);
-      osCounts[os]       = (osCounts[os]       || 0) + 1;
-      signedCount[signed] = (signedCount[signed] || 0) + 1;
+      osCounts[os]   = (osCounts[os]   || 0) + 1;
+      sevCounts[sev] = (sevCounts[sev] || 0) + 1;
     });
 
     const byOs = Object.entries(osCounts)
       .sort((a, b) => b[1] - a[1])
       .map(([name, value]) => ({ name, value }));
 
-    const bySignedStatus = Object.entries(signedCount)
-      .map(([name, value], i) => ({ name, value, fill: ['#10b981', '#ef4444', '#64748b'][i % 3] }));
+    const bySeverity = Object.entries(sevCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value, fill: SEV_COLORS[i % SEV_COLORS.length] }));
 
     const appCountMap = {};
     apps.forEach(a => {
-      const name = a.name || a.appName || a.applicationName || 'Unknown';
+      const name = a.applicationName || a.name || a.appName || 'Unknown';
       appCountMap[name] = (appCountMap[name] || 0) + 1;
     });
     const topApps = Object.entries(appCountMap)
@@ -1236,14 +1527,13 @@ function ApplicationInsightsSection({ s1AppAgent }) {
       .map(([name, installs]) => ({
         name: name.length > 30 ? name.slice(0, 30) + '…' : name,
         installs,
-      }))
-      .reverse();
+      }));
 
     return {
       totalApps:        appNames.size,
       uniquePublishers: publishers.size,
       byOs,
-      bySignedStatus,
+      bySeverity,
       topApps,
     };
   }, [apps]);
@@ -1251,7 +1541,7 @@ function ApplicationInsightsSection({ s1AppAgent }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="7" title="Application Insights — Installed Applications" color="#0ea5e9">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {totalApps} unique application{totalApps !== 1 ? 's' : ''} installed across {apps.length} endpoint record{apps.length !== 1 ? 's' : ''} from {uniquePublishers} publisher{uniquePublishers !== 1 ? 's' : ''}.
           {apps.length === 0 ? ' Run a sync to populate this section.' : ''}
         </p>
@@ -1270,26 +1560,26 @@ function ApplicationInsightsSection({ s1AppAgent }) {
               {byOs.length === 0 ? <NoData /> : (
                 <BarChart width={CW2} height={240} data={byOs} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={90} />
+                  <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
                   <Tooltip contentStyle={TT_STYLE} />
                   <Bar dataKey="value" fill="#0ea5e9" radius={[0, 3, 3, 0]}>
-                    <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                    <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                   </Bar>
                 </BarChart>
               )}
             </ChartCard>
 
-            <ChartCard title="Signed vs Unsigned Publishers" w={W2}>
-              {bySignedStatus.length === 0 ? <NoData /> : (
-                <BarChart width={CW2} height={200} data={bySignedStatus} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
+            <ChartCard title="Applications by Severity" w={W2}>
+              {bySeverity.length === 0 ? <NoData /> : (
+                <BarChart width={CW2} height={200} data={bySeverity} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={80} tickLine={false} axisLine={false} />
+                  <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={80} tickLine={false} axisLine={false} />
                   <Tooltip contentStyle={TT_STYLE} />
                   <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={26} name="Apps">
-                    {bySignedStatus.map((d, i) => <Cell key={i} fill={d.fill} />)}
-                    <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                    {bySeverity.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                    <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                   </Bar>
                 </BarChart>
               )}
@@ -1299,13 +1589,13 @@ function ApplicationInsightsSection({ s1AppAgent }) {
           {topApps.length > 0 && (
             <div data-pdf-block="true" style={{ marginBottom: 16 }}>
               <ChartCard title="Top Applications by Install Count" w={WF}>
-                <BarChart width={CWF} height={200} data={topApps} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
+                <BarChart width={CWF} height={Math.max(320, topApps.length * 36)} data={topApps} layout="vertical" margin={{ left: 8, right: 48, top: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={220} />
+                  <XAxis type="number" tick={{ fontSize: 13 }} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={280} interval={0} />
                   <Tooltip contentStyle={TT_STYLE} />
-                  <Bar dataKey="installs" fill="#6366f1" radius={[0, 3, 3, 0]}>
-                    <LabelList dataKey="installs" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                  <Bar dataKey="installs" fill="#6366f1" radius={[0, 3, 3, 0]} maxBarSize={28}>
+                    <LabelList dataKey="installs" position="right" style={{ fontSize: 13, fill: '#374151', fontWeight: 600 }} />
                   </Bar>
                 </BarChart>
               </ChartCard>
@@ -1313,14 +1603,26 @@ function ApplicationInsightsSection({ s1AppAgent }) {
           )}
 
           <DataTable
-            columns={['App Name', 'Publisher', 'Version', 'OS', 'Signed']}
-            rows={apps.slice(0, 10).map(a => ({
-              'App Name':  (a.name || a.appName || a.applicationName || '-').slice(0, 40),
-              'Publisher': (a.publisher || a.vendor || '-').slice(0, 30),
-              'Version':   a.version || '-',
-              'OS':        a.osType  || a.os || '-',
-              'Signed':    a.signedStatus || (a.isSigned != null ? (a.isSigned ? 'signed' : 'unsigned') : '-'),
-            }))}
+            title="Installed Applications (Top 10 by Install Count)"
+            columns={['App Name', 'Publisher', 'Version', 'OS', 'Installs']}
+            rows={(() => {
+              const map = {};
+              apps.forEach(a => {
+                const name = a.applicationName || a.name || a.appName || 'Unknown';
+                if (!map[name]) map[name] = { name, publisher: a.applicationVendor || a.publisher || a.vendor || '-', version: a.applicationVersion || a.version || '-', os: a.osType || a.os || '-', count: 0 };
+                map[name].count++;
+              });
+              return Object.values(map)
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 10)
+                .map(r => ({
+                  'App Name':  r.name.slice(0, 40),
+                  'Publisher': r.publisher.slice(0, 30),
+                  'Version':   r.version,
+                  'OS':        r.os,
+                  'Installs':  r.count,
+                }));
+            })()}
           />
         </>
       )}
@@ -1354,7 +1656,7 @@ function ZohoSection({ zohoTickets }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="8" title="Zoho Desk — Support Tickets" color="#f59e0b">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {tickets.length} support ticket{tickets.length !== 1 ? 's' : ''} recorded.{' '}
           {open > 0 ? `${open} open` : 'No open tickets'}{highPri > 0 ? `, ${highPri} high priority` : ''}.{' '}
           {closed > 0 ? `${closed} closed.` : ''}
@@ -1374,8 +1676,8 @@ function ZohoSection({ zohoTickets }) {
             <ChartCard title="By Status" w={W2}>
               <BarChart width={CW2} height={240} data={statusData} margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} allowDecimals={false} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={60}>
                   {statusData.map((d, i) => <Cell key={i} fill={ZOHO_STATUS_COLORS[d.name] || COLORS[i % COLORS.length]} />)}
@@ -1386,8 +1688,8 @@ function ZohoSection({ zohoTickets }) {
             <ChartCard title="By Priority" w={W2}>
               <BarChart width={CW2} height={240} data={priorityData} margin={{ left: 4, right: 16, top: 8, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 13 }} />
+                <YAxis tick={{ fontSize: 13 }} allowDecimals={false} />
                 <Tooltip contentStyle={TT_STYLE} />
                 <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={60}>
                   {priorityData.map((d, i) => <Cell key={i} fill={ZOHO_PRIORITY_COLORS[d.name] || COLORS[i % COLORS.length]} />)}
@@ -1397,6 +1699,7 @@ function ZohoSection({ zohoTickets }) {
           </ChartRow>
 
           <DataTable
+            title="Recent Support Tickets (Top 10)"
             columns={['Subject', 'Status', 'Priority', 'Contact', 'Created']}
             rows={tickets.slice(0, 10).map(t => ({
               'Subject':  (t.subject     || '—').slice(0, 60),
@@ -1428,9 +1731,9 @@ function FirewallSection({ fwRiskRaw, fwAttackersRaw, fwConnectionsRaw }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="9" title="Palo Alto Firewall — Network Security" color="#f97316">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {hasAnyData
-            ? `Firewall telemetry covering inbound threat sessions and top network connections. ${topAttackers.length > 0 ? `${topAttackers.length} distinct attacker source${topAttackers.length !== 1 ? 's' : ''} identified — the most active source is "${topAttackers[topAttackers.length - 1]?.name}" with ${topAttackers[topAttackers.length - 1]?.value} session${topAttackers[topAttackers.length - 1]?.value !== 1 ? 's' : ''}.` : ''} ${riskTrend.length > 0 ? `The risk/session trend covers ${riskTrend.length} day${riskTrend.length !== 1 ? 's' : ''} of data — spikes may indicate active scanning or coordinated attack campaigns.` : ''}`
+            ? `Firewall telemetry covering inbound threat sessions and top network connections. ${topAttackers.length > 0 ? `${topAttackers.length} distinct attacker source${topAttackers.length !== 1 ? 's' : ''} identified — the most active source is "${topAttackers[0]?.name}" with ${topAttackers[0]?.value} session${topAttackers[0]?.value !== 1 ? 's' : ''}.` : ''} ${riskTrend.length > 0 ? `The risk/session trend covers ${riskTrend.length} day${riskTrend.length !== 1 ? 's' : ''} of data — spikes may indicate active scanning or coordinated attack campaigns.` : ''}`
             : 'No firewall data available. Ensure the Palo Alto integration is configured and data has been synced.'
           }
         </p>
@@ -1443,8 +1746,8 @@ function FirewallSection({ fwRiskRaw, fwAttackersRaw, fwConnectionsRaw }) {
               <ChartCard title="Risk / Session Trend" w={W2}>
                 <LineChart width={CW2} height={280} data={riskTrend} margin={{ left: 4, right: 16, top: 8, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <XAxis dataKey="date" tick={{ fontSize: 12 }} angle={-30} textAnchor="end" />
+                  <YAxis tick={{ fontSize: 13 }} />
                   <Tooltip contentStyle={TT_STYLE} />
                   <Line type="monotone" dataKey="sessions" stroke="#f97316" strokeWidth={2} dot={false} />
                 </LineChart>
@@ -1454,11 +1757,11 @@ function FirewallSection({ fwRiskRaw, fwAttackersRaw, fwConnectionsRaw }) {
               <ChartCard title="Top Attacker Sources" w={W2}>
                 <BarChart width={CW2} height={280} data={topAttackers} layout="vertical" margin={{ left: 4, right: 36, top: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                  <XAxis type="number" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={130} />
+                  <XAxis type="number" tick={{ fontSize: 13 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 13 }} width={130} />
                   <Tooltip contentStyle={TT_STYLE} />
                   <Bar dataKey="value" fill="#ef4444" radius={[0,3,3,0]}>
-                    <LabelList dataKey="value" position="right" style={{ fontSize: 11, fill: '#374151', fontWeight: 600 }} />
+                    <LabelList dataKey="value" position="right" style={{ fontSize: 12, fill: '#374151', fontWeight: 600 }} />
                   </Bar>
                 </BarChart>
               </ChartCard>
@@ -1467,8 +1770,8 @@ function FirewallSection({ fwRiskRaw, fwAttackersRaw, fwConnectionsRaw }) {
 
           {connTable && connTable.rows.length > 0 && (
             <div data-pdf-block="true">
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Top Connections</p>
               <DataTable
+                title="Top Connections"
                 columns={connTable.columns.slice(0, 6)}
                 rows={connTable.rows.slice(0, 8)}
               />
@@ -1500,9 +1803,11 @@ function toWDateKey(d) {
   return dt.toISOString().slice(0, 10);
 }
 
-function computeWeeklyStats(harmonyEvents, s1Threats) {
+function computeWeeklyStats(harmonyEvents, s1Threats, s1Agents = [], s1Cves = []) {
   const events  = Array.isArray(harmonyEvents) ? harmonyEvents : [];
   const threats = Array.isArray(s1Threats)     ? s1Threats     : [];
+  const agents  = Array.isArray(s1Agents)      ? s1Agents      : [];
+  const cves    = Array.isArray(s1Cves)        ? s1Cves        : [];
 
   // Anchor the comparison window to the most recent data date, not today.
   // This ensures charts populate even when data was synced days/weeks ago.
@@ -1626,6 +1931,61 @@ function computeWeeklyStats(harmonyEvents, s1Threats) {
     { name: 'Recurring', value: recCount, fill: '#f97316' },
   ].filter(d => d.value > 0);
 
+  // Top users by threat count this week vs last
+  const getUser = t => t.threatInfo?.initiatingUsername || t.threatInfo?.processUser || t.agentDetectionInfo?.agentLastLoggedInUserName || '';
+  const userThis = {}, userLast = {};
+  thisWeekThreats.forEach(t => { const u = getUser(t); if (u) userThis[u] = (userThis[u] || 0) + 1; });
+  lastWeekThreats.forEach(t => { const u = getUser(t); if (u) userLast[u] = (userLast[u] || 0) + 1; });
+  const topUsers = Object.entries(userThis).sort((a, b) => b[1] - a[1]).slice(0, 5)
+    .map(([u, tw]) => ({ user: u.length > 40 ? u.slice(0, 40) + '…' : u, 'This Week': tw, 'Last Week': userLast[u] || 0 }));
+
+  // New agents enrolled this week vs last
+  const getAgentDate = a => a.registeredAt || a.createdAt || a.registered_at || a.created_at;
+  const newAgentsThis = agents.filter(a => { const d = parseTs(getAgentDate(a)); return d && d >= thisStart && d <= thisEnd; }).length;
+  const newAgentsLast = agents.filter(a => { const d = parseTs(getAgentDate(a)); return d && d >= lastStart && d < lastEnd; }).length;
+
+  // CVEs use daysDetected (integer) rather than a timestamp.
+  // daysDetected <= 7  → appeared this week; 8–14 → appeared last week.
+  const inCveWindowThis = c => { const n = Number(c.daysDetected); return !isNaN(n) && n >= 0 && n <= 7; };
+  const inCveWindowLast = c => { const n = Number(c.daysDetected); return !isNaN(n) && n > 7 && n <= 14; };
+  const newCvesThis  = cves.filter(inCveWindowThis).length;
+  const newCvesLast  = cves.filter(inCveWindowLast).length;
+  const critCvesThis = cves.filter(c => inCveWindowThis(c) && (String(c.severity || '').toUpperCase() === 'CRITICAL' || Number(c.baseScore) >= 9)).length;
+
+  // MTTD trend — avg minutes from identifiedAt to createdAt, per day over last 14 days
+  const mttdMap = {};
+  last14.forEach(({ key }) => { mttdMap[key] = { sum: 0, count: 0 }; });
+  threats.forEach(t => {
+    const created    = parseTs(t.threatInfo?.createdAt);
+    const identified = parseTs(t.threatInfo?.identifiedAt);
+    if (!created || !identified) return;
+    const k = toWDateKey(created);
+    if (!mttdMap[k]) return;
+    mttdMap[k].sum   += (created - identified) / 60000;
+    mttdMap[k].count += 1;
+  });
+  const mttdTrend = last14
+    .map(({ key, label }) => mttdMap[key]?.count > 0 ? { date: label, avg: Math.round(mttdMap[key].sum / mttdMap[key].count) } : null)
+    .filter(Boolean);
+
+  // MTTM trend — avg minutes from identifiedAt to mitigationEndedAt, per day over last 14 days
+  const mttmMap = {};
+  last14.forEach(({ key }) => { mttmMap[key] = { sum: 0, count: 0 }; });
+  threats.forEach(t => {
+    const identified   = parseTs(t.threatInfo?.identifiedAt);
+    const successEntry = (t.mitigationStatus || []).find(s => s.status === 'success');
+    if (!identified || !successEntry) return;
+    const ended = parseTs(successEntry.mitigationEndedAt);
+    if (!ended) return;
+    const k = toWDateKey(identified);
+    if (!mttmMap[k]) return;
+    mttmMap[k].sum   += (ended - identified) / 60000;
+    mttmMap[k].count += 1;
+  });
+  const mttmTrend = last14
+    .map(({ key, label }) => mttmMap[key]?.count > 0 ? { date: label, avg: Math.round(mttmMap[key].sum / mttmMap[key].count) } : null)
+    .filter(Boolean);
+
   return {
     kpi: {
       harmonyThis: thisWeekEvents.length,  harmonyLast: lastWeekEvents.length,
@@ -1633,10 +1993,13 @@ function computeWeeklyStats(harmonyEvents, s1Threats) {
       remRateThis: thisWeekEvents.length > 0 ? Math.round((thisRem / thisWeekEvents.length) * 100) : 0,
       remRateLast: lastWeekEvents.length > 0 ? Math.round((lastRem / lastWeekEvents.length) * 100) : 0,
       critThis: thisCrit, critLast: lastCrit,
+      newAgentsThis, newAgentsLast,
+      newCvesThis, newCvesLast, critCvesThis,
     },
     periodLabel,
     trend14dEvents, eventTypes, trend14dThreats, remComp, severityShift,
-    topSenders, topEndpoints, newVsRecurring, thisNameCount: thisNames.size, newCount,
+    topSenders, topEndpoints, topUsers, newVsRecurring, thisNameCount: thisNames.size, newCount,
+    mttdTrend, mttmTrend,
   };
 }
 
@@ -1647,12 +2010,12 @@ function WowKpiCard({ label, thisWeek, lastWeek, unit = '', higherIsBetter = fal
   const improved = change === null ? null : higherIsBetter ? change >= 0 : change <= 0;
   return (
     <div style={{ background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px', flex: '1 1 0', minWidth: 120 }}>
-      <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, marginBottom: 2 }}>
-        <div style={{ fontSize: 28, fontWeight: 800, color: '#111827' }}>{thisWeek}{unit}</div>
+        <div style={{ fontSize: 30, fontWeight: 800, color: '#111827' }}>{thisWeek}{unit}</div>
         {change !== null && (
           <span style={{
-            fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 9999, marginBottom: 3,
+            fontSize: 12, fontWeight: 700, padding: '2px 6px', borderRadius: 9999, marginBottom: 3,
             background: improved ? '#dcfce7' : '#fee2e2',
             color:      improved ? '#166534' : '#991b1b',
           }}>
@@ -1660,129 +2023,142 @@ function WowKpiCard({ label, thisWeek, lastWeek, unit = '', higherIsBetter = fal
           </span>
         )}
       </div>
-      <div style={{ fontSize: 11, color: '#9ca3af' }}>vs {lastWeek}{unit} last 7 days</div>
+      <div style={{ fontSize: 12, color: '#9ca3af' }}>vs {lastWeek}{unit} last 7 days</div>
     </div>
   );
 }
 
-function WeeklyInsightsSection({ harmonyEvents, s1Threats }) {
-  const d = useMemo(() => computeWeeklyStats(harmonyEvents, s1Threats), [harmonyEvents, s1Threats]);
-  const hasHarmony = Array.isArray(harmonyEvents) && harmonyEvents.length > 0;
-  const hasThreats = Array.isArray(s1Threats)     && s1Threats.length  > 0;
+const SUB_HEADER_STYLE = {
+  fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em',
+  marginBottom: 12, marginTop: 4, paddingBottom: 6, borderBottom: '1px solid #e5e7eb',
+};
+
+function WeeklyInsightsSection({ harmonyEvents, s1Threats, s1Agents, s1Cves }) {
+  const d = useMemo(
+    () => computeWeeklyStats(harmonyEvents, s1Threats, s1Agents, s1Cves),
+    [harmonyEvents, s1Threats, s1Agents, s1Cves],
+  );
+  const hasThreats = Array.isArray(s1Threats) && s1Threats.length > 0;
 
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
-      <SectionHeader number="10" title="Weekly Insights — 7-Day Comparison" color="#7c3aed">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
-          Week-over-week comparison anchored to the latest available data date.{' '}
-          {d.kpi.harmonyThis} Harmony event{d.kpi.harmonyThis !== 1 ? 's' : ''} and {d.kpi.threatsThis} S1 threat{d.kpi.threatsThis !== 1 ? 's' : ''} recorded this period,
-          compared to {d.kpi.harmonyLast} and {d.kpi.threatsLast} respectively in the preceding week.{' '}
-          Remediation rate this week: {d.kpi.remRateThis}%{d.kpi.remRateLast > 0 ? ` (was ${d.kpi.remRateLast}% last week)` : ''}.
+      <SectionHeader number="W" title="Weekly Insights — 7-Day Comparison" color="#7c3aed">
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+          Week-over-week comparison anchored to the most recent data date.{' '}
+          Covers S1 Threats, Agents, Most At-Risk endpoints, Application CVEs etc..
         </p>
       </SectionHeader>
-      <div data-pdf-block="true" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '8px 14px', marginBottom: 16 }}>
-        <p style={{ margin: 0, fontSize: 12, color: '#5b21b6' }}>
-          <strong>Current period:</strong> {d.periodLabel} &nbsp;·&nbsp; Compared against the preceding 7 days.
-          {' '}All charts are anchored to the latest available data date.
+
+      <div data-pdf-block="true" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '8px 14px', marginBottom: 20 }}>
+        <p style={{ margin: 0, fontSize: 13, color: '#5b21b6' }}>
+          <strong>Period:</strong> {d.periodLabel} &nbsp;·&nbsp; Compared against the preceding 7 days. All data anchored to the latest available sync date.
         </p>
       </div>
 
-      {/* KPI strip */}
-      <KpiRow>
-        <WowKpiCard label="Harmony Events"        thisWeek={d.kpi.harmonyThis}  lastWeek={d.kpi.harmonyLast}  higherIsBetter={false} />
-        <WowKpiCard label="S1 Threats Detected"   thisWeek={d.kpi.threatsThis}  lastWeek={d.kpi.threatsLast}  higherIsBetter={false} />
-        <WowKpiCard label="Remediation Rate"       thisWeek={d.kpi.remRateThis}  lastWeek={d.kpi.remRateLast}  unit="%" higherIsBetter={true} />
-        <WowKpiCard label="Critical / High Events" thisWeek={d.kpi.critThis}     lastWeek={d.kpi.critLast}     higherIsBetter={false} />
-      </KpiRow>
-
-      {/* Chart row 1: 14-day trends */}
-      <ChartRow>
-        <ChartCard title="14-Day Harmony Event Trend (by Type)" w={W2}>
-          {!hasHarmony ? <NoData /> : (
-            <BarChart width={CW2} height={240} data={d.trend14dEvents} margin={{ left: 4, right: 8, top: 8, bottom: 30 }}>
+      {/* ── S1 Threats ── */}
+      <div data-pdf-block="true" style={{ marginBottom: 20 }}>
+        <p style={{ ...SUB_HEADER_STYLE, color: '#ef4444' }}>S1 Threats</p>
+        <KpiRow mb={12}>
+          <WowKpiCard label="Threats Detected"   thisWeek={d.kpi.threatsThis} lastWeek={d.kpi.threatsLast} higherIsBetter={false} />
+        </KpiRow>
+        {hasThreats && (
+          <ChartCard title="14-Day Threat Detection vs Mitigation" w={WF}>
+            <ComposedChart width={CWF} height={220} data={d.trend14dThreats} margin={{ left: 4, right: 8, top: 8, bottom: 30 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+              <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
               <Tooltip contentStyle={TT_STYLE} />
-              <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-              {d.eventTypes.map((type, i) => (
-                <Bar key={type} dataKey={type} stackId="a"
-                  fill={EVENT_TYPE_COLORS_RPT[type] ?? FALLBACK_COLORS_RPT[i % FALLBACK_COLORS_RPT.length]}
-                  name={type.replace(/_/g, ' ')} />
-              ))}
-            </BarChart>
-          )}
-        </ChartCard>
-
-        <ChartCard title="14-Day S1 Threat Detection vs Mitigation" w={W2}>
-          {!hasThreats ? <NoData /> : (
-            <ComposedChart width={CW2} height={240} data={d.trend14dThreats} margin={{ left: 4, right: 8, top: 8, bottom: 30 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip contentStyle={TT_STYLE} />
-              <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
+              <Legend iconSize={9} wrapperStyle={{ fontSize: 12 }} />
               <Area type="monotone" dataKey="detected"  stroke="#ef4444" strokeWidth={2} fill="#fee2e2" dot={false} name="Detected" />
               <Line type="monotone" dataKey="mitigated" stroke="#10b981" strokeWidth={2} dot={false} name="Mitigated" />
             </ComposedChart>
+          </ChartCard>
+        )}
+        {(d.mttdTrend.length > 0 || d.mttmTrend.length > 0) && (
+          <ChartRow mb={0}>
+            <ChartCard title="MTTD Trend (14 days)" w={W2}
+              description="Mean time to detect — minutes from threat identification to creation timestamp, per day.">
+              {d.mttdTrend.length === 0 ? <NoData /> : (
+                <LineChart width={CW2} height={220} data={d.mttdTrend} margin={{ left: 4, right: 16, top: 8, bottom: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v < 60 ? `${v}m` : `${Math.floor(v/60)}h`} />
+                  <Tooltip contentStyle={TT_STYLE} formatter={v => [`${v}m`, 'Avg MTTD']} />
+                  <Line type="monotone" dataKey="avg" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Avg MTTD" />
+                </LineChart>
+              )}
+            </ChartCard>
+            <ChartCard title="MTTM Trend (14 days)" w={W2}
+              description="Mean time to mitigate — minutes from identification to successful mitigation, per day.">
+              {d.mttmTrend.length === 0 ? <NoData /> : (
+                <LineChart width={CW2} height={220} data={d.mttmTrend} margin={{ left: 4, right: 16, top: 8, bottom: 30 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" />
+                  <YAxis tick={{ fontSize: 11 }} tickFormatter={v => v < 60 ? `${v}m` : `${Math.floor(v/60)}h`} />
+                  <Tooltip contentStyle={TT_STYLE} formatter={v => [`${v}m`, 'Avg MTTM']} />
+                  <Line type="monotone" dataKey="avg" stroke="#06b6d4" strokeWidth={2} dot={{ r: 3 }} name="Avg MTTM" />
+                </LineChart>
+              )}
+            </ChartCard>
+          </ChartRow>
+        )}
+      </div>
+
+      <div style={{ height: 16 }} />
+
+      {/* ── S1 Agents ── */}
+      <div data-pdf-section="true" style={{ marginBottom: 20 }}>
+        <p style={{ ...SUB_HEADER_STYLE, color: '#6366f1' }}>S1 Agents</p>
+        <KpiRow mb={0}>
+          <WowKpiCard label="New Agents Enrolled" thisWeek={d.kpi.newAgentsThis} lastWeek={d.kpi.newAgentsLast} higherIsBetter={true} />
+        </KpiRow>
+      </div>
+
+      {/* ── Most At-Risk ── */}
+      <div data-pdf-block="true" style={{ marginBottom: 20 }}>
+        <p style={{ ...SUB_HEADER_STYLE, color: '#f97316' }}>Most At-Risk</p>
+        <ChartRow mb={0}>
+          {d.topEndpoints.length > 0 ? (
+            <ChartCard title="Top Endpoints by Threat Count" w={W2}>
+              <DataTable
+                columns={['endpoint', 'This Week', 'Last Week']}
+                rows={d.topEndpoints}
+                maxRows={5}
+              />
+            </ChartCard>
+          ) : (
+            <ChartCard title="Top Endpoints by Threat Count" w={W2}><NoData /></ChartCard>
           )}
-        </ChartCard>
-      </ChartRow>
-
-      {/* Chart row 2: WoW volume + severity shift */}
-      <ChartRow>
-        <ChartCard title="Daily Event Volume — This Week vs Last Week" w={W2}>
-          {!hasHarmony ? <NoData /> : (
-            <BarChart width={CW2} height={220} data={d.remComp} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="day" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip contentStyle={TT_STYLE} />
-              <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="This Week" fill="#6366f1" radius={[3,3,0,0]} maxBarSize={26} />
-              <Bar dataKey="Last Week" fill="#a5b4fc" radius={[3,3,0,0]} maxBarSize={26} />
-            </BarChart>
+          {d.topUsers.length > 0 ? (
+            <ChartCard title="Top Users by Threat Count" w={W2}>
+              <DataTable
+                columns={['user', 'This Week', 'Last Week']}
+                rows={d.topUsers}
+                maxRows={5}
+              />
+            </ChartCard>
+          ) : (
+            <ChartCard title="Top Users by Threat Count" w={W2}><NoData /></ChartCard>
           )}
-        </ChartCard>
+        </ChartRow>
+      </div>
 
-        <ChartCard title="Severity Distribution Shift (Harmony Events)" w={W2}>
-          {d.severityShift.length === 0 ? <NoData /> : (
-            <BarChart width={CW2} height={220} data={d.severityShift} margin={{ left: 4, right: 8, top: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis dataKey="severity" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
-              <Tooltip contentStyle={TT_STYLE} />
-              <Legend iconSize={9} wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="thisWeek" fill="#6366f1" radius={[3,3,0,0]} maxBarSize={26} name="This Week" />
-              <Bar dataKey="lastWeek" fill="#a5b4fc" radius={[3,3,0,0]} maxBarSize={26} name="Last Week" />
-            </BarChart>
-          )}
-        </ChartCard>
-      </ChartRow>
+      {/* ── Application CVEs ── */}
+      <div data-pdf-block="true" style={{ marginBottom: 20 }}>
+        <p style={{ ...SUB_HEADER_STYLE, color: '#dc2626' }}>Application CVEs</p>
+        <KpiRow mb={0}>
+          <WowKpiCard label="New CVEs (last 7 days)"      thisWeek={d.kpi.newCvesThis}   lastWeek={d.kpi.newCvesLast}   higherIsBetter={false} />
+          <WowKpiCard label="Critical (last 7 days)"    thisWeek={d.kpi.critCvesThis}  lastWeek={0}                   higherIsBetter={false} />
+        </KpiRow>
+      </div>
 
-      {/* Top senders table */}
-      {d.topSenders.length > 0 && (
-        <div data-pdf-block="true" style={{ marginBottom: 12 }}>
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Top Senders — Week-over-Week</p>
-          <DataTable
-            columns={['sender_address', 'This Week', 'Last Week', 'Change']}
-            rows={d.topSenders}
-            maxRows={10}
-          />
-        </div>
-      )}
-
-      {/* Top endpoints table */}
-      {d.topEndpoints.length > 0 && (
-        <div data-pdf-block="true">
-          <p style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Most Targeted Endpoints (This Week)</p>
-          <DataTable
-            columns={['endpoint', 'This Week', 'Last Week']}
-            rows={d.topEndpoints}
-            maxRows={5}
-          />
-        </div>
-      )}
+      {/* ── Application Insights ── */}
+      {/* <div data-pdf-block="true">
+        <p style={{ ...SUB_HEADER_STYLE, color: '#0ea5e9' }}>Application Insights</p>
+        <p style={{ fontSize: 13, color: '#6b7280', margin: 0 }}>
+          Installed application records do not carry weekly installation timestamps — week-over-week comparison is not available for this section.
+        </p>
+      </div> */}
     </div>
   );
 }
@@ -1847,7 +2223,7 @@ function OpenActionSection({ s1Threats, s1Agents, s1Cves }) {
   return (
     <div data-pdf-section="true" style={{ padding: '24px 32px', background: '#fff', borderTop: '1px solid #f3f4f6' }}>
       <SectionHeader number="11" title="Open Action Items" color="#dc2626">
-        <p style={{ fontSize: 12, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
+        <p style={{ fontSize: 13, color: '#4b5563', margin: 0, lineHeight: 1.7 }}>
           {items.length} open action item{items.length !== 1 ? 's' : ''} identified across endpoint protection, agent health, and vulnerability management.{' '}
           {items.filter(i => i.priority === 'CRITICAL').length > 0
             ? `${items.filter(i => i.priority === 'CRITICAL').length} item${items.filter(i => i.priority === 'CRITICAL').length !== 1 ? 's are' : ' is'} CRITICAL and require immediate escalation.`
@@ -1857,11 +2233,11 @@ function OpenActionSection({ s1Threats, s1Agents, s1Cves }) {
         </p>
       </SectionHeader>
       <div data-pdf-block="true">
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ background: '#f9fafb' }}>
               {['Priority', 'Category', 'Count', 'Required Action'].map(col => (
-                <th key={col} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em', borderBottom: '2px solid #e5e7eb' }}>{col}</th>
+                <th key={col} style={{ padding: '7px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', fontSize: 12, letterSpacing: '0.04em', borderBottom: '2px solid #e5e7eb' }}>{col}</th>
               ))}
             </tr>
           </thead>
@@ -1869,7 +2245,7 @@ function OpenActionSection({ s1Threats, s1Agents, s1Cves }) {
             {items.map((item, i) => (
               <tr key={i} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
                 <td style={{ padding: '7px 12px', borderBottom: '1px solid #f3f4f6' }}>
-                  <span style={{ background: PRIORITY_COLOR[item.priority], color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{item.priority}</span>
+                  <span style={{ background: PRIORITY_COLOR[item.priority], color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 12, fontWeight: 700 }}>{item.priority}</span>
                 </td>
                 <td style={{ padding: '7px 12px', fontWeight: 600, color: '#374151', borderBottom: '1px solid #f3f4f6' }}>{item.category}</td>
                 <td style={{ padding: '7px 12px', color: '#374151', borderBottom: '1px solid #f3f4f6', fontWeight: 700 }}>{item.count}</td>
@@ -1886,9 +2262,9 @@ function OpenActionSection({ s1Threats, s1Agents, s1Cves }) {
 // ── Footer ────────────────────────────────────────────────────────────────────
 function ReportFooter({ orgName, generatedAt }) {
   return (
-    <div style={{ background: '#1e1b4b', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <p style={{ margin: 0, fontSize: 11, color: '#a5b4fc' }}>CISO Dashboard — {orgName}</p>
-      <p style={{ margin: 0, fontSize: 11, color: '#a5b4fc' }}>Generated {new Date(generatedAt).toLocaleString()}</p>
+    <div data-pdf-footer="true" style={{ background: '#1e1b4b', padding: '16px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <p style={{ margin: 0, fontSize: 12, color: '#a5b4fc' }}>CISO Dashboard — {orgName}</p>
+      <p style={{ margin: 0, fontSize: 12, color: '#a5b4fc' }}>Generated {new Date(generatedAt).toLocaleString()}</p>
     </div>
   );
 }
@@ -1905,19 +2281,36 @@ export default function ReportDocument({ data }) {
     [s1Agents]
   );
 
+  const weeklyStats = useMemo(() => computeWeeklyStats(harmonyEvents, s1Threats, s1Agents, s1Cves), [harmonyEvents, s1Threats, s1Agents, s1Cves]);
+
   return (
-    <div style={{ width: 1100, background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#111827' }}>
+    <div style={{ width: 1400, background: '#fff', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', color: '#111827' }}>
       <CoverPage orgName={orgName} generatedAt={generatedAt} groups={groups} />
-      <ExecutiveSummary s1Threats={s1Threats} s1Agents={s1Agents} harmonyEvents={harmonyEvents} />
-      <CheckpointSection harmonyEvents={harmonyEvents} />
+      <SectionCoverPage number={1} title="Checkpoint Harmony" color="#2563eb" logo={checkpointLogo} logoLabel="Import Checkpoint logo"
+        subtitle="Email and cloud security telemetry — threat detection, event monitoring, remediation status, and week-over-week volume analysis across all connected mail and cloud platforms." />
+      <CheckpointSection harmonyEvents={harmonyEvents} weeklyStats={weeklyStats} />
+
+      <SectionCoverPage number={2} title="SentinelOne" color="#ef4444" logo={sentinelOneLogo} logoLabel="Import SentinelOne logo"
+        subtitle="Endpoint protection across threat detection, agent health, at-risk entities, application vulnerabilities, and installed software — powered by SentinelOne." />
       <S1ThreatsSection s1Threats={s1Threats} />
       <S1AgentsSection s1Agents={s1Agents} generatedAt={generatedAt} removedAgentsCount={removedAgentsCount} />
       <MostAtRiskSection s1Threats={s1Threats} />
       <S1CveSection s1Cves={s1Cves} />
       <ApplicationInsightsSection s1AppAgent={s1AppAgent} />
+
+      <WeeklyInsightsSection harmonyEvents={harmonyEvents} s1Threats={s1Threats} s1Agents={s1Agents} s1Cves={s1Cves} />
+
+      <SectionCoverPage number={3} title="Zoho Desk" color="#f59e0b" logo={zohoLogo} logoLabel="Import Zoho logo"
+        subtitle="Support ticket management and helpdesk operations — open ticket volume, priority distribution, resolution rates, and recent ticket activity across the organisation's helpdesk queue." />
       <ZohoSection zohoTickets={zohoTickets} />
+
+      <SectionCoverPage number={4} title="Palo Alto Firewall" color="#f97316" logo={paloAltoLogo} logoLabel="Import Palo Alto logo"
+        subtitle="Network security telemetry from the Palo Alto perimeter firewall — inbound threat session trends, top attacker source analysis, and significant connection activity over the reporting period." />
       <FirewallSection fwRiskRaw={fwRiskRaw} fwAttackersRaw={fwAttackersRaw} fwConnectionsRaw={fwConnectionsRaw} />
-      <WeeklyInsightsSection harmonyEvents={harmonyEvents} s1Threats={s1Threats} />
+
+      <SectionCoverPage number={5} title="Open Action Items" color="#dc2626"
+        subtitle="Priority-ranked remediation tasks requiring immediate follow-up — offline agents, firewall policy violations, unmitigated threats, outdated agent versions, and long-standing unpatched vulnerabilities."
+        logoLabel="No logo required" />
       <OpenActionSection s1Threats={s1Threats} s1Agents={s1Agents} s1Cves={s1Cves} />
       <ReportFooter orgName={orgName} generatedAt={generatedAt} />
     </div>

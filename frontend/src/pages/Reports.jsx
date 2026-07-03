@@ -65,7 +65,7 @@ export default function Reports() {
     setGenError('');
     setGenStep('Fetching data…');
     try {
-      const data = await fetchReportData(currentOrg?.name || 'Organisation');
+      const data = await fetchReportData(currentOrg?.org_name || 'Organisation');
       setReportData(data);
       setGenStep('Rendering report…');
     } catch (err) {
@@ -83,18 +83,19 @@ export default function Reports() {
     const timer = setTimeout(async () => {
       setGenStep('Generating PDF…');
       try {
-        const orgSlug = (currentOrg?.name || 'report').replace(/\s+/g, '_').toLowerCase();
+        const orgSlug = (currentOrg?.org_name || 'report').replace(/\s+/g, '_').toLowerCase();
         const date    = new Date().toISOString().slice(0, 10);
         const filename = `${orgSlug}_security_report_${date}.pdf`;
         await generatePdfFromElement(reportRef.current, filename);
         await api.post('/reports', {
-          title:   `Security Report — ${currentOrg?.name || 'Organisation'} — ${date}`,
+          title:   `Security Report — ${currentOrg?.org_name || 'Organisation'} — ${date}`,
           content: `Auto-generated PDF security report covering Checkpoint Harmony, SentinelOne, and Palo Alto Firewall data. File: ${filename}`,
           type:    'security',
           status:  'published',
         });
         loadReports();
       } catch (err) {
+        console.error('PDF generation failed:', err);
         setGenError('PDF generation failed. Please try again.');
       } finally {
         setReportData(null);
@@ -138,7 +139,7 @@ export default function Reports() {
 
       {/* Hidden report capture target — off-screen so browser fully paints SVG charts */}
       {reportData && (
-        <div style={{ position: 'fixed', top: '-9999px', left: 0, width: '1100px', pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', top: '-9999px', left: 0, width: '1400px', pointerEvents: 'none' }}>
           <div ref={reportRef}>
             <ReportDocument data={reportData} />
           </div>
