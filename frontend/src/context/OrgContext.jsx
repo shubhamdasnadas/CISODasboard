@@ -33,6 +33,7 @@ export function OrgProvider({ children }) {
       } else {
         setCurrentOrgState(null);
         localStorage.removeItem(STORAGE_KEY);
+        delete api.defaults.headers.common['X-Org-Id'];
       }
     } finally {
       setLoading(false);
