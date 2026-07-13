@@ -178,9 +178,9 @@ async function main() {
   await runMigration();
   await runSeedData();
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT || 3001;
   const server = app.listen(PORT, () => {
-    console.log(`🚀 CISO Dashboard API listening on http://localhost:${PORT}`);
+    console.log(`🚀 CISO Dashboard API listening on http://0.0.0.0:${PORT}`);
   });
 
   server.on('error', (err) => {
