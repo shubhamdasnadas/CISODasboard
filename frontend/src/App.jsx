@@ -11,6 +11,7 @@ import Organisations from './pages/Organisations.jsx';
 import Users from './pages/Users.jsx';
 import ApiTokens from './pages/ApiTokens.jsx';
 import ApiResponses from './pages/ApiResponses.jsx';
+import Osint from './pages/Osint.jsx';
 import Settings from './pages/Settings.jsx';
 import AppLayout from './components/AppLayout.jsx';
 
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="/organisations"  element={<Organisations />} />
             <Route path="/tokens"         element={<ApiTokens />} />
             <Route path="/responses"      element={<ApiResponses />} />
+            <Route path="/osint"          element={<Osint />} />
             <Route path="/settings"       element={<Settings />} />
 
             {/* Security (SentinelOne) */}

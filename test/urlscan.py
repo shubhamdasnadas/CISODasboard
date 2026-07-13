@@ -13,8 +13,8 @@ import requests
 
 from _common import print_header, print_result, print_error, print_footer
 
-API_KEY = "YOUR_URLSCAN_API_KEY"  # only needed for submitting new scans
-DOMAIN = "example.com"  # sample domain to search
+API_KEY = "019f5ac9-b97f-76dc-b50f-1b24c71a857f"  # only needed for submitting new scans
+DOMAIN = "youtube.com"  # sample domain to search
 URL = "https://urlscan.io/api/v1/search/"
 
 
