@@ -92,14 +92,14 @@ You should see:
 ```
 🔌 Central DB connection OK (localhost:5432/cisodashboard)
 ✅ Connected to central database: cisodashboard
-🆕 Created database: ciso_org_1 (for Techsec Global Private Ltd)
-✔  Database exists: ciso_org_2
-🆕 Created database: ciso_org_3 (for Acme Cyber Defense)
-🆕 Created database: ciso_org_4 (for Northwind Logistics)
-🆕 Created database: ciso_org_5 (for BlueShield Healthcare)
-✔  ciso_org_3 (Acme Cyber Defense): seeded 4 token(s), 6 response(s)
-✔  ciso_org_4 (Northwind Logistics): seeded 2 token(s), 2 response(s)
-✔  ciso_org_5 (BlueShield Healthcare): seeded 3 token(s), 4 response(s)
+🆕 Created database: ciso_org_techsec (for Techsec Global Private Ltd)
+✔  Database exists: ciso_org_pcpl
+🆕 Created database: ciso_org_acme (for Acme Cyber Defense)
+🆕 Created database: ciso_org_northwind (for Northwind Logistics)
+🆕 Created database: ciso_org_blueshield (for BlueShield Healthcare)
+✔  ciso_org_acme (Acme Cyber Defense): seeded 4 token(s), 6 response(s)
+✔  ciso_org_northwind (Northwind Logistics): seeded 2 token(s), 2 response(s)
+✔  ciso_org_blueshield (BlueShield Healthcare): seeded 3 token(s), 4 response(s)
 🚚 Migration complete. Totals: 4 tokens, 0 responses.
 🌱 Seed complete. Totals: 11 tokens, 12 responses.
 🚀 CISO Dashboard API listening on http://localhost:5000

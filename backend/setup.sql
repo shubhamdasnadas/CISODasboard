@@ -65,10 +65,18 @@ CREATE TABLE super_admin (
 );
 
 CREATE TABLE organisations (
-  id SERIAL PRIMARY KEY,
-  org_name VARCHAR(100) NOT NULL,
-  address TEXT,
-  mobile_no VARCHAR(20)
+  id          SERIAL       PRIMARY KEY,
+  org_name    VARCHAR(100) NOT NULL,
+  address     TEXT,
+  mobile_no   VARCHAR(20),
+  slug        VARCHAR(100) UNIQUE,
+  is_active   BOOLEAN      DEFAULT TRUE,
+  email       VARCHAR(255),
+  website     VARCHAR(255),
+  industry    VARCHAR(100),
+  plan        VARCHAR(50)  DEFAULT 'free',
+  color       VARCHAR(20),
+  description TEXT
 );
 
 CREATE TABLE users (
@@ -97,17 +105,50 @@ CREATE TABLE api_responses (
 
 CREATE INDEX idx_api_responses_org_api ON api_responses(org_id, api_name, fetched_at DESC);
 
+-- Org-level members (non-super-admin users belonging to specific orgs)
+CREATE TABLE org_users (
+  id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id        INTEGER     NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  name          VARCHAR(255) NOT NULL,
+  email         VARCHAR(255) NOT NULL,
+  password      VARCHAR(255),
+  role          VARCHAR(50) NOT NULL DEFAULT 'org_user',
+  department    VARCHAR(100),
+  is_active     BOOLEAN     NOT NULL DEFAULT TRUE,
+  allowed_pages TEXT[],
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (email, org_id)
+);
+CREATE INDEX IF NOT EXISTS idx_org_users_org_id ON org_users(org_id);
+CREATE INDEX IF NOT EXISTS idx_org_users_email  ON org_users(email);
+
+CREATE OR REPLACE FUNCTION set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER trg_org_users_updated_at
+  BEFORE UPDATE ON org_users
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- Cron sharding configuration
+CREATE TABLE cron_config (
+  key   TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+INSERT INTO cron_config (key, value) VALUES ('total_shards', '1');
+
 -- ============================================================
 -- SEED DATA
 -- ============================================================
 
 -- 5 organisations
-INSERT INTO organisations (org_name, address, mobile_no) VALUES
-('Techsec Global Private Ltd', 'Mumbai, MH',     '022-11110000'),
-('PCPL Construction',           'Pune, MH',       '020-22220000'),
-('Acme Cyber Defense',          'Bangalore, KA',  '080-33330000'),
-('Northwind Logistics',         'Delhi, DL',      '011-44440000'),
-('BlueShield Healthcare',       'Chennai, TN',    '044-55550000');
+INSERT INTO organisations (org_name, address, mobile_no, slug) VALUES
+('Techsec Global Private Ltd', 'Mumbai, MH',     '022-11110000', 'techsec'),
+('PCPL Construction',           'Pune, MH',       '020-22220000', 'pcpl'),
+('Acme Cyber Defense',          'Bangalore, KA',  '080-33330000', 'acme'),
+('Northwind Logistics',         'Delhi, DL',      '011-44440000', 'northwind'),
+('BlueShield Healthcare',       'Chennai, TN',    '044-55550000', 'blueshield');
 
 -- 7 users with REAL bcrypt password hashes (cost 10)
 INSERT INTO users (username, password, role, org_ids) VALUES

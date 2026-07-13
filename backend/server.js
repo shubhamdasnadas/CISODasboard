@@ -15,6 +15,30 @@ const tokenRoutes = require('./routes/apiTokens');
 const { router: responseRoutes, fetchAndStore } = require('./routes/apiResponses');
 const healthRoutes = require('./routes/health');
 
+// Integration routes
+const { authMiddleware } = require('./middleware/authMiddleware');
+const { orgMiddleware } = require('./middleware/orgMiddleware');
+const sentineloneRoutes = require('./routes/sentinelone');
+const firewallRoutes = require('./routes/firewall');
+const harmonyRoutes = require('./routes/harmony');
+const dashboardRoutes = require('./routes/dashboard');
+const zohoRoutes = require('./routes/zoho');
+const newsRoutes = require('./routes/news');
+const projectsRoutes = require('./routes/projects');
+const reportsRoutes = require('./routes/reportsRoute');
+const notificationsRoutes = require('./routes/notificationsRoute');
+const supportRoutes = require('./routes/support');
+const billingRoutes = require('./routes/billing');
+const analyticsRoutes = require('./routes/analyticsRoute');
+const syncRoutes = require('./routes/syncRoute');
+const adminOrgsRoutes = require('./routes/adminOrgs');
+const memberRoutes = require('./routes/memberRoute');
+
+// Sync services (for cron)
+const { syncSentinelOne } = require('./services/sentinelone');
+const { syncFirewall } = require('./services/firewall');
+const { syncHarmony } = require('./services/harmony');
+
 const app = express();
 
 app.use(cors());
@@ -24,6 +48,7 @@ app.get('/', (req, res) => {
   res.json({ name: 'CISO Dashboard API', status: 'running' });
 });
 
+// ─── Legacy routes (unchanged) ────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/organisations', orgRoutes);
@@ -31,33 +56,53 @@ app.use('/api/tokens', tokenRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/health', healthRoutes);
 
+// ─── Integration routes (auth + org context required) ─────────────────────────
+const withOrg = [authMiddleware, orgMiddleware];
+
+app.use('/api/sentinelone', withOrg, sentineloneRoutes);
+app.use('/api/firewall', withOrg, firewallRoutes);
+app.use('/api/harmony', withOrg, harmonyRoutes);
+app.use('/api/dashboard', withOrg, dashboardRoutes);
+app.use('/api/zoho', withOrg, zohoRoutes);
+app.use('/api/news', withOrg, newsRoutes);
+app.use('/api/projects', withOrg, projectsRoutes);
+app.use('/api/reports', withOrg, reportsRoutes);
+app.use('/api/notifications', withOrg, notificationsRoutes);
+app.use('/api/support', withOrg, supportRoutes);
+app.use('/api/billing', withOrg, billingRoutes);
+app.use('/api/analytics', withOrg, analyticsRoutes);
+app.use('/api/sync', withOrg, syncRoutes);
+app.use('/api/member', [authMiddleware], memberRoutes);
+
+// Admin routes (superAdmin only — orgMiddleware not needed, uses centralPool directly)
+app.use('/api/admin', [authMiddleware], adminOrgsRoutes);
+
 /**
- * Background job — every 1 minute, fetch every api_token row across ALL
- * per-org databases and store responses in the matching org DB.
+ * Legacy background job — every 1 minute, refresh generic api_tokens responses
  */
 async function runBackgroundJob() {
   try {
-    // Pull org ids from the central registry (identity data).
-    const { rows: orgs } = await centralPool.query('SELECT id FROM organisations ORDER BY id ASC');
+    const { rows: orgs } = await centralPool.query('SELECT id, slug FROM organisations ORDER BY id ASC');
     let total = 0;
 
-    for (const { id: orgId } of orgs) {
+    for (const { id: orgId, slug: orgSlug } of orgs) {
+      if (!orgSlug) continue;
       let tokens;
       try {
-        const pool = getOrgPool(orgId);
+        const pool = getOrgPool(orgSlug);
         const r = await pool.query('SELECT api_name FROM api_tokens ORDER BY id ASC');
         tokens = r.rows;
       } catch (e) {
-        console.error(`[cron] Cannot read tokens for org=${orgId}:`, e.message);
+        console.error(`[cron] Cannot read tokens for org=${orgSlug}:`, e.message);
         continue;
       }
 
       for (const { api_name } of tokens) {
         try {
-          await fetchAndStore(orgId, api_name);
+          await fetchAndStore(orgSlug, api_name);
           total += 1;
         } catch (e) {
-          console.error(`[cron] Failed org=${orgId} api=${api_name}:`, e.message);
+          console.error(`[cron] Failed org=${orgSlug} api=${api_name}:`, e.message);
         }
       }
     }
@@ -67,13 +112,56 @@ async function runBackgroundJob() {
   }
 }
 
-// Every 1 minute — fetches every org's api_tokens and refreshes responses
-cron.schedule('*/1 * * * *', runBackgroundJob);
+/**
+ * Integration sync — every 30 minutes, sync all integrations for all orgs
+ */
+async function runIntegrationSync() {
+  try {
+    const { rows: orgs } = await centralPool.query(
+      'SELECT id, slug FROM organisations WHERE is_active = TRUE ORDER BY id'
+    );
+    for (const { id: orgId, slug: orgSlug } of orgs) {
+      if (!orgSlug) continue;
+      try {
+        const pool = getOrgPool(orgSlug);
+        const { rows: credsRows } = await pool.query(
+          'SELECT integration, credentials FROM integration_credentials'
+        );
+        const creds = {};
+        credsRows.forEach(r => { creds[r.integration] = r.credentials; });
+
+        if (creds.sentinelone) {
+          await syncSentinelOne(orgSlug, creds.sentinelone).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] S1 error:`, e.message)
+          );
+        }
+        if (creds.firewall) {
+          await syncFirewall(orgSlug, creds.firewall).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] FW error:`, e.message)
+          );
+        }
+        if (creds.harmony) {
+          await syncHarmony(orgSlug, creds.harmony).catch(e =>
+            console.error(`[int-cron][org=${orgSlug}] CP error:`, e.message)
+          );
+        }
+      } catch (e) {
+        console.error(`[int-cron] org ${orgSlug} failed:`, e.message);
+      }
+    }
+    console.log('[int-cron] Integration sync complete');
+  } catch (err) {
+    console.error('[int-cron] Error:', err.message);
+  }
+}
+
+// Every 1 minute — legacy api_token refresh
+cron.schedule('*/15 * * * *', runBackgroundJob);
+
+// Every 30 minutes — integration sync (S1, Firewall, Harmony)
+cron.schedule('*/30 * * * *', runIntegrationSync);
 
 async function main() {
-  // 0. Smoke-test the central DB connection BEFORE doing any work.
-  //    Without this, a wrong DB password or unreachable Postgres wouldn't
-  //    show up until the first login attempt returns a generic 500.
   try {
     await centralPool.query('SELECT 1');
     console.log(`🔌 Central DB connection OK (${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'cisodashboard'})`);
@@ -86,13 +174,8 @@ async function main() {
     process.exit(1);
   }
 
-  // 1. Ensure each registered organisation has its own database + schema.
   await ensureOrgDatabases();
-
-  // 2. Migrate existing central-DB data into the per-org DBs (idempotent).
   await runMigration();
-
-  // 3. Seed dummy data into any per-org DB that doesn't have it yet.
   await runSeedData();
 
   // 4. Start the HTTP server.
@@ -104,14 +187,12 @@ async function main() {
   server.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
       console.error(`\n❌ FATAL: Port ${PORT} is already in use.`);
-      console.error(`   Either stop the process holding it, or set PORT=<other> in backend/.env\n`);
     } else {
       console.error('\n❌ FATAL: HTTP server error:', err.message, '\n');
     }
     process.exit(1);
   });
 
-  // 5. Run the background fetch once after 3 seconds (gives the server time to bind).
   setTimeout(runBackgroundJob, 3000);
 }
 
@@ -120,7 +201,6 @@ main().catch((err) => {
   process.exit(1);
 });
 
-// Clean shutdown
 process.on('SIGINT', async () => {
   console.log('\nShutting down...');
   await shutdownAllPools();

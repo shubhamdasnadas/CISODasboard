@@ -12,13 +12,11 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef(null);
 
-  // If already logged in, jump to org selection (which may auto-pick)
   useEffect(() => {
     const token = localStorage.getItem('ciso_token');
     if (token) navigate('/select-organisation');
   }, [navigate]);
 
-  // Debounced username check — 500ms after typing stops
   useEffect(() => {
     if (!username) {
       setUserStatus({ checked: false, exists: false, organisations: [] });
@@ -34,24 +32,13 @@ export default function Login() {
         setShowPassword(Boolean(data.exists));
         setError(data.exists ? '' : 'Username not found');
       } catch (err) {
-        // Log the full axios error to the browser console for diagnosis.
-        // The message you see in the UI comes from one of three branches:
-        //   1. backend returned a 500 with a `detail` field      → "Server error: <detail>"
-        //   2. backend returned a 500 with a plain `error` field → "Server error: <error>"
-        //   3. request never reached the backend (network/CORS/proxy) → "<statusText or code>"
         console.error('[check-username] failed:', err);
         const body = err.response?.data;
-        if (body?.detail) {
-          setError(`Server error: ${body.detail}`);
-        } else if (body?.error) {
-          setError(`Server error: ${body.error}`);
-        } else if (err.response) {
-          setError(`Server returned ${err.response.status}: ${err.response.statusText || 'no body'}`);
-        } else if (err.code === 'ERR_NETWORK') {
-          setError('Network error: is the backend running on http://localhost:5000?');
-        } else {
-          setError(`Cannot reach server (${err.code || err.message || 'unknown error'})`);
-        }
+        if (body?.detail) setError(`Server error: ${body.detail}`);
+        else if (body?.error) setError(`Server error: ${body.error}`);
+        else if (err.response) setError(`Server returned ${err.response.status}: ${err.response.statusText || 'no body'}`);
+        else if (err.code === 'ERR_NETWORK') setError('Network error: is the backend running on http://localhost:3001?');
+        else setError(`Cannot reach server (${err.code || err.message || 'unknown error'})`);
       }
     }, 500);
     return () => clearTimeout(debounceRef.current);
@@ -65,7 +52,6 @@ export default function Login() {
       const { data } = await api.post('/auth/login', { username, password });
       localStorage.setItem('ciso_token', data.token);
       localStorage.setItem('ciso_user', JSON.stringify(data.user));
-      // Clear any stale org selection from a previous session
       localStorage.removeItem('ciso_current_org_id');
       navigate('/select-organisation');
     } catch (err) {
@@ -76,51 +62,51 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-navy-900 p-6">
-      <div className="w-full max-w-md bg-navy-800 rounded-3xl p-8 border border-navy-700 shadow-2xl">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl">
-            🛡️
+    <div className="min-h-screen flex items-center justify-center bg-[var(--background)] p-6 transition-colors duration-200">
+      <div className="w-full max-w-md bg-[var(--card-bg)] rounded-2xl p-8 border border-[var(--card-border)] shadow-xl">
+        {/* Logo */}
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0">
+            <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold">CISO Dashboard</h1>
-            <p className="text-muted text-sm">Sign in to continue</p>
+            <h1 className="text-xl font-bold text-[var(--foreground)]">SecureHub</h1>
+            <p className="text-[var(--muted)] text-sm">Sign in to continue</p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Username */}
           <div>
-            <label className="text-sm text-muted">Username</label>
-            <div className="relative mt-1">
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Username</label>
+            <div className="relative">
               <input
                 type="text"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={e => setUsername(e.target.value)}
                 placeholder="Enter your username"
-                className="w-full px-4 py-3 pr-10 rounded-xl bg-navy-700 border border-navy-700 focus:border-accent focus:outline-none text-white placeholder-muted"
+                className="w-full px-4 py-2.5 pr-10 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
                 autoFocus
               />
               {userStatus.checked && userStatus.exists && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-400">✓</span>
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-500">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
               )}
             </div>
           </div>
 
-          {/* Status / orgs */}
-          {userStatus.checked && !userStatus.exists && (
-            <div className="text-rose-400 text-sm">✗ Username not found</div>
-          )}
-
-          {userStatus.exists && userStatus.organisations.length > 0 && (
-            <div className="bg-navy-700 rounded-xl p-4">
-              <div className="text-sm text-muted mb-2">Connected organisations</div>
+          {/* Orgs preview */}
+          {userStatus.exists && userStatus.organisations?.length > 0 && (
+            <div className="bg-[var(--muted-bg)] rounded-xl p-4">
+              <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wide mb-2">Connected organisations</p>
               <div className="flex flex-wrap gap-2">
-                {userStatus.organisations.map((o) => (
-                  <span
-                    key={o.id}
-                    className="px-3 py-1 rounded-full bg-accent/20 text-accent text-sm border border-accent/40"
-                  >
+                {userStatus.organisations.map(o => (
+                  <span key={o.id} className="px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-sm border border-indigo-200 dark:border-indigo-700">
                     {o.org_name}
                   </span>
                 ))}
@@ -131,31 +117,38 @@ export default function Login() {
           {/* Password */}
           {showPassword && (
             <div>
-              <label className="text-sm text-muted">Password</label>
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">Password</label>
               <input
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 placeholder="Enter your password"
-                className="w-full px-4 py-3 mt-1 rounded-xl bg-navy-700 border border-navy-700 focus:border-accent focus:outline-none text-white placeholder-muted"
+                className="w-full px-4 py-2.5 rounded-xl bg-[var(--input-bg)] border border-[var(--input-border)] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               />
             </div>
           )}
 
-          {error && <div className="text-rose-400 text-sm">{error}</div>}
+          {error && (
+            <p className="text-sm text-red-500 flex items-center gap-1.5">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={!showPassword || !password || loading}
-            className="w-full py-3 rounded-xl bg-accent hover:bg-accent-600 disabled:opacity-50 font-semibold transition"
+            className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold transition-colors"
           >
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
 
-        <div className="mt-6 text-xs text-muted text-center">
-          Seed users: <span className="text-white">Shubham</span>, <span className="text-white">Ramesh</span>, <span className="text-white">Radhesh</span>, <span className="text-white">Raju</span>
-        </div>
+        <p className="mt-6 text-xs text-[var(--muted)] text-center">
+          Seed users: <span className="text-[var(--foreground)] font-medium">Shubham</span>, <span className="text-[var(--foreground)] font-medium">Ramesh</span>, <span className="text-[var(--foreground)] font-medium">Radhesh</span>, <span className="text-[var(--foreground)] font-medium">Raju</span>
+        </p>
       </div>
     </div>
   );

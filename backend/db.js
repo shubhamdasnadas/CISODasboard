@@ -43,29 +43,40 @@ centralPool.on('error', (err) => {
  * PER-ORG POOL CACHE — one Pool instance per org database.
  * Pool connections are expensive, so we reuse them.
  */
-const orgPoolCache = new Map(); // orgId -> Pool
+const orgPoolCache = new Map(); // orgSlug -> Pool
 
-function getOrgPool(orgId) {
-  const id = parseInt(orgId, 10);
-  if (!id) throw new Error(`getOrgPool: invalid orgId ${orgId}`);
+function getOrgPool(orgSlug) {
+  if (!orgSlug || typeof orgSlug !== 'string') {
+    throw new Error(`getOrgPool: invalid orgSlug "${orgSlug}"`);
+  }
 
-  if (orgPoolCache.has(id)) return orgPoolCache.get(id);
+  if (orgPoolCache.has(orgSlug)) return orgPoolCache.get(orgSlug);
 
+  const dbName = `ciso_org_${orgSlug}`;
   const pool = new Pool({
     host: DB_HOST,
     port: DB_PORT,
-    database: `ciso_org_${id}`,
+    database: dbName,
     user: DB_USER,
     password: DB_PASSWORD,
   });
 
   pool.on('error', (err) => {
-    console.error(`❌ Unexpected error on org pool ${id}:`, err);
+    console.error(`❌ Unexpected error on org pool ${dbName}:`, err);
   });
 
-  orgPoolCache.set(id, pool);
-  console.log(`✅ Connected to per-org database: ciso_org_${id}`);
+  orgPoolCache.set(orgSlug, pool);
+  console.log(`✅ Connected to per-org database: ${dbName}`);
   return pool;
+}
+
+/**
+ * Resolve an integer org ID to its slug (used in routes that receive integer IDs).
+ * Returns null if not found.
+ */
+async function getOrgSlug(orgId) {
+  const { rows } = await centralPool.query('SELECT slug FROM organisations WHERE id = $1', [orgId]);
+  return rows[0]?.slug ?? null;
 }
 
 /**
@@ -115,7 +126,7 @@ async function ensureOrgDatabases() {
 
   // 2. Read orgs from central registry.
   const { rows: orgs } = await centralPool.query(
-    'SELECT id, org_name FROM organisations ORDER BY id ASC'
+    'SELECT id, slug, org_name FROM organisations ORDER BY id ASC'
   );
 
   if (orgs.length === 0) {
@@ -130,7 +141,13 @@ async function ensureOrgDatabases() {
   const failed = [];
 
   for (const org of orgs) {
-    const dbName = `ciso_org_${org.id}`;
+    const orgSlug = org.slug;
+    if (!orgSlug) {
+      console.warn(`⚠️  Skipped org ${org.id} (${org.org_name}): no slug set`);
+      failed.push({ id: org.id, name: org.org_name, error: 'missing slug' });
+      continue;
+    }
+    const dbName = `ciso_org_${orgSlug}`;
     try {
       const created = await withMaintenanceClient(async (client) => {
         const r = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
@@ -150,10 +167,10 @@ async function ensureOrgDatabases() {
       }
 
       // Always apply the per-org schema (now idempotent via CREATE TABLE IF NOT EXISTS).
-      const pool = getOrgPool(org.id);
+      const pool = getOrgPool(orgSlug);
       const schemaPath = path.join(__dirname, 'schema_per_org.sql');
       await applySchema(pool, schemaPath);
-      succeeded.push(org.id);
+      succeeded.push(orgSlug);
     } catch (e) {
       console.error(`⚠️  Skipped org ${org.id} (${org.org_name}):`, e.message);
       failed.push({ id: org.id, name: org.org_name, error: e.message });
@@ -171,13 +188,12 @@ async function ensureOrgDatabases() {
 /**
  * Drop the cached pool for a given org (used after deleting an org).
  */
-function closeOrgPool(orgId) {
-  const id = parseInt(orgId, 10);
-  const pool = orgPoolCache.get(id);
+function closeOrgPool(orgSlug) {
+  const pool = orgPoolCache.get(orgSlug);
   if (pool) {
     pool.end().catch(() => {});
-    orgPoolCache.delete(id);
-    console.log(`🛑 Closed pool for ciso_org_${id}`);
+    orgPoolCache.delete(orgSlug);
+    console.log(`🛑 Closed pool for ciso_org_${orgSlug}`);
   }
 }
 
@@ -194,6 +210,7 @@ async function shutdownAllPools() {
 module.exports = {
   centralPool,
   getOrgPool,
+  getOrgSlug,
   ensureOrgDatabases,
   closeOrgPool,
   shutdownAllPools,

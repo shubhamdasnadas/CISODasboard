@@ -19,11 +19,20 @@ async function markMigrated(orgPool) {
   await orgPool.query('INSERT INTO _migration_done DEFAULT VALUES');
 }
 
+async function applySchemaPatches(orgPool, slug) {
+  await orgPool.query(
+    'ALTER TABLE s1_agents ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ'
+  );
+  console.log(`✔  ciso_org_${slug}: schema patches applied`);
+}
+
 async function migrateOrg(org) {
-  const orgPool = getOrgPool(org.id);
+  const orgPool = getOrgPool(org.slug);
+
+  await applySchemaPatches(orgPool, org.slug);
 
   if (await isMigrated(orgPool)) {
-    console.log(`✔  ciso_org_${org.id}: already migrated`);
+    console.log(`✔  ciso_org_${org.slug}: already migrated`);
     return { tokens: 0, responses: 0 };
   }
 
@@ -52,7 +61,7 @@ async function migrateOrg(org) {
   }
 
   await markMigrated(orgPool);
-  console.log(`✔  ciso_org_${org.id}: migrated ${tokens.length} token(s), ${responses.length} response(s)`);
+  console.log(`✔  ciso_org_${org.slug}: migrated ${tokens.length} token(s), ${responses.length} response(s)`);
 
   return { tokens: tokens.length, responses: responses.length };
 }
@@ -60,7 +69,7 @@ async function migrateOrg(org) {
 async function runMigration() {
   console.log('🚚 Starting data migration to per-org databases...');
   const { rows: orgs } = await centralPool.query(
-    'SELECT id, org_name FROM organisations ORDER BY id ASC'
+    'SELECT id, slug, org_name FROM organisations ORDER BY id ASC'
   );
 
   if (orgs.length === 0) {

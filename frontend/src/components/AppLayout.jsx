@@ -1,94 +1,296 @@
+import { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import OrgSwitcher from './OrgSwitcher.jsx';
 import { useOrg } from '../context/OrgContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 
-function NavItem({ to, icon, label }) {
+const NAV = [
+  {
+    key: 'dashboard', name: 'Dashboard', path: '/dashboard',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>,
+  },
+  {
+    key: 'security', name: 'Security', path: '/security',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>,
+  },
+  {
+    key: 'checkpoint', name: 'Check Point', path: '/checkpoint',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
+    key: 'paloalto', name: 'Firewall', path: '/paloalto',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>,
+  },
+  {
+    key: 'zoho', name: 'Zoho One', path: '/zoho',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
+  },
+  {
+    key: 'members', name: 'Members', path: '/members',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
+    key: 'projects', name: 'Projects', path: '/projects',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+  },
+  {
+    key: 'reports', name: 'Reports', path: '/reports',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+  },
+  {
+    key: 'analytics', name: 'Analytics', path: '/analytics',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  },
+  {
+    key: 'billing', name: 'Billing', path: '/billing',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>,
+  },
+  {
+    key: 'notifications', name: 'Notifications', path: '/notifications',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>,
+  },
+  {
+    key: 'support', name: 'Support', path: '/support',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" /></svg>,
+  },
+  {
+    key: 'settings', name: 'Settings', path: '/settings',
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
+    key: 'admin', name: 'Admin Orgs', path: '/admin/organizations', superAdminOnly: true,
+    icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+  },
+];
+
+function Sidebar({ mobileOpen, onClose }) {
+  const navigate = useNavigate();
+  const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
+  const { setCurrentOrg } = useOrg();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const isSuperAdmin = user.role === 'superAdmin';
+  const initials = (user.username || '?').slice(0, 2).toUpperCase();
+
+  const visibleNav = NAV.filter(item => {
+    if (item.superAdminOnly) return isSuperAdmin;
+    return true;
+  });
+
+  const logout = async () => {
+    setLoggingOut(true);
+    localStorage.removeItem('ciso_token');
+    localStorage.removeItem('ciso_user');
+    localStorage.removeItem('ciso_current_org_id');
+    setCurrentOrg(null);
+    navigate('/login');
+  };
+
+  const content = (
+    <div className="w-60 bg-[var(--sidebar-bg)] border-r border-[var(--sidebar-border)] h-full flex flex-col transition-colors duration-200">
+      {/* Logo */}
+      <div className="px-5 py-5 border-b border-[var(--sidebar-border)] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div>
+            <p className="font-bold text-[var(--foreground)] text-sm leading-tight">SecureHub</p>
+            <p className="text-xs text-[var(--muted)] leading-tight">Enterprise Platform</p>
+          </div>
+        </div>
+        {onClose && (
+          <button onClick={onClose} className="lg:hidden p-1.5 rounded-lg hover:bg-[var(--muted-bg)] text-[var(--muted)]">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        {visibleNav.map(item => (
+          <NavLink key={item.key} to={item.path} onClick={onClose}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)]'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <span className={isActive ? 'text-white' : 'text-[var(--muted)]'}>{item.icon}</span>
+                {item.name}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* User */}
+      <div className="px-3 py-4 border-t border-[var(--sidebar-border)]">
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-[var(--muted-bg)] mb-1">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0 bg-indigo-600">
+            {initials}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-[var(--foreground)] truncate">{user.username}</p>
+            <p className="text-xs text-[var(--muted)] capitalize">{user.role?.replace(/_/g, ' ')}</p>
+          </div>
+        </div>
+        <button
+          disabled={loggingOut}
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-[var(--muted)] hover:bg-[var(--muted-bg)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          {loggingOut ? 'Signing out…' : 'Sign out'}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `flex items-center gap-3 px-4 py-3 rounded-xl transition ${
-          isActive
-            ? 'bg-accent text-white shadow-lg'
-            : 'text-muted hover:bg-navy-700 hover:text-white'
-        }`
-      }
-    >
-      <span className="text-xl">{icon}</span>
-      <span className="font-medium">{label}</span>
-    </NavLink>
+    <>
+      {/* Desktop */}
+      <div className="hidden lg:flex flex-shrink-0">{content}</div>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+          <div className="relative z-10 flex-shrink-0">{content}</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function TopBar({ onMenuClick }) {
+  const { organisations, currentOrg, switchOrg } = useOrg();
+  const { theme, toggleTheme } = useTheme();
+  const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const liveOrgs = organisations.filter(Boolean);
+
+  return (
+    <div className="h-14 bg-[var(--topbar-bg)] border-b border-[var(--topbar-border)] flex items-center justify-between px-4 sm:px-6 flex-shrink-0 z-30 transition-colors duration-200">
+      {/* Left */}
+      <div className="flex items-center gap-3">
+        <button onClick={onMenuClick} className="lg:hidden p-2 rounded-lg hover:bg-[var(--muted-bg)] text-[var(--muted)] hover:text-[var(--foreground)] transition-colors">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+
+        {liveOrgs.length > 0 && (
+          <div className="relative" ref={ref}>
+            <button
+              onClick={() => setOpen(v => !v)}
+              className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[var(--card-border)] hover:bg-[var(--muted-bg)] text-sm font-medium text-[var(--foreground)] min-w-[200px] transition-colors"
+            >
+              {currentOrg ? (
+                <span className="w-6 h-6 rounded-md flex items-center justify-center text-white text-xs font-bold flex-shrink-0 bg-indigo-600">
+                  {currentOrg.org_name?.[0]?.toUpperCase()}
+                </span>
+              ) : (
+                <span className="w-6 h-6 rounded-md bg-[var(--muted-bg)] flex items-center justify-center flex-shrink-0">
+                  <svg className="w-3 h-3 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16" />
+                  </svg>
+                </span>
+              )}
+              <span className="flex-1 truncate text-left">{currentOrg?.org_name || 'Select Organization'}</span>
+              <svg className={`w-4 h-4 text-[var(--muted)] flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {open && (
+              <div className="absolute top-full left-0 mt-1.5 w-72 bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl shadow-xl z-50 overflow-hidden">
+                <div className="px-4 pt-3 pb-2">
+                  <p className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">Organizations</p>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                  {liveOrgs.map(org => {
+                    const isSelected = currentOrg?.id === org.id;
+                    return (
+                      <button key={org.id} onClick={() => { setOpen(false); switchOrg(org.id); }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--muted-bg)] transition-colors text-left ${isSelected ? 'bg-indigo-50 dark:bg-indigo-900/30' : ''}`}>
+                        <span className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0 bg-indigo-600">
+                          {org.org_name?.[0]?.toUpperCase()}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className={`block text-sm font-medium truncate ${isSelected ? 'text-indigo-600 dark:text-indigo-400' : 'text-[var(--foreground)]'}`}>{org.org_name}</span>
+                        </span>
+                        {isSelected && (
+                          <svg className="w-4 h-4 text-indigo-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Right */}
+      <div className="flex items-center gap-3">
+        {/* Theme toggle */}
+        <button onClick={toggleTheme} aria-label="Toggle theme"
+          className="w-9 h-9 flex items-center justify-center rounded-lg border border-[var(--card-border)] hover:bg-[var(--muted-bg)] transition-colors text-[var(--muted)] hover:text-[var(--foreground)]">
+          {theme === 'dark' ? (
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+            </svg>
+          ) : (
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
+          )}
+        </button>
+
+        {/* User badge */}
+        <div className="flex items-center gap-2 bg-[var(--muted-bg)] border border-[var(--card-border)] rounded-lg px-3 py-1.5">
+          <svg className="w-3.5 h-3.5 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span className="text-sm font-medium text-[var(--foreground)] capitalize">{user.role?.replace(/_/g, ' ')}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
 export default function AppLayout() {
-  const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
-  const { organisations, currentOrg, setCurrentOrg } = useOrg();
-
-  function logout() {
-    localStorage.removeItem('ciso_token');
-    localStorage.removeItem('ciso_user');
-    localStorage.removeItem('ciso_current_org_id');
-    setCurrentOrg(null);   // <-- also clear in-memory context state
-    navigate('/login');
-  }
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex h-screen bg-navy-900 text-white">
-      {/* Sidebar */}
-      <aside className="w-64 bg-navy-800 p-5 flex flex-col gap-2 border-r border-navy-700">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center font-bold">
-            🛡️
-          </div>
-          <div>
-            <div className="font-bold text-lg">CISO</div>
-            <div className="text-xs text-muted">Dashboard</div>
-          </div>
-        </div>
-
-        <NavItem to="/dashboard"      icon="📊" label="Dashboard" />
-        <NavItem to="/organisations"  icon="🏢" label="Organisations" />
-        {user.role === 'superAdmin' && (
-          <NavItem to="/users"        icon="👥" label="Users" />
-        )}
-        <NavItem to="/tokens"         icon="🔑" label="API Tokens" />
-        <NavItem to="/responses"      icon="📡" label="API Responses" />
-
-        <div className="mt-auto pt-4 border-t border-navy-700">
-          <div className="px-4 py-2 text-sm text-muted">
-            <div className="font-semibold text-white">{user.username}</div>
-            <div className="capitalize">{user.role}</div>
-          </div>
-          <button
-            onClick={logout}
-            className="w-full mt-2 px-4 py-2 text-left rounded-xl text-muted hover:bg-navy-700 hover:text-white"
-          >
-            🚪 Logout
-          </button>
-        </div>
-      </aside>
-
-      {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        {/* Top bar with org switcher */}
-        <div className="sticky top-0 z-40 bg-navy-900/80 backdrop-blur border-b border-navy-700 px-8 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-sm text-muted">
-            <span className="text-white font-semibold">
-              {currentOrg?.org_name || '—'}
-            </span>
-            <span>•</span>
-            <span>
-              {organisations.length} organisation{organisations.length === 1 ? '' : 's'} linked
-            </span>
-          </div>
-          <OrgSwitcher />
-        </div>
-
-        <div className="p-8">
+    <div className="flex h-screen overflow-hidden bg-[var(--background)] transition-colors duration-200">
+      <Sidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

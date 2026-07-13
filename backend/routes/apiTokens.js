@@ -1,5 +1,5 @@
 const express = require('express');
-const { centralPool, getOrgPool } = require('../db');
+const { centralPool, getOrgPool, getOrgSlug } = require('../db');
 const { authMiddleware, requireSuperAdmin } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -26,7 +26,9 @@ router.get('/:orgId', authMiddleware, async (req, res) => {
     if (!canAccessOrg(req.user, orgId)) {
       return res.status(403).json({ error: 'Access denied for this org' });
     }
-    const pool = getOrgPool(orgId);
+    const orgSlug = await getOrgSlug(orgId);
+    if (!orgSlug) return res.status(404).json({ error: 'Organisation not found' });
+    const pool = getOrgPool(orgSlug);
     const result = await pool.query(
       'SELECT id, api_name, token, created_at FROM api_tokens ORDER BY id ASC'
     );
@@ -50,13 +52,12 @@ router.post('/', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'org_id, api_name, token are required' });
     }
     const orgId = parseInt(org_id, 10);
-    if (req.user.role !== 'superAdmin') {
-      if (!Array.isArray(req.user.org_ids) || !req.user.org_ids.includes(orgId)) {
-        return res.status(403).json({ error: 'Access denied for this org' });
-      }
+    if (!canAccessOrg(req.user, orgId)) {
+      return res.status(403).json({ error: 'Access denied for this org' });
     }
-
-    const pool = getOrgPool(orgId);
+    const orgSlug = await getOrgSlug(orgId);
+    if (!orgSlug) return res.status(404).json({ error: 'Organisation not found' });
+    const pool = getOrgPool(orgSlug);
     const result = await pool.query(
       `INSERT INTO api_tokens (api_name, token)
        VALUES ($1, $2)
@@ -82,7 +83,9 @@ router.delete('/:id', authMiddleware, requireSuperAdmin, async (req, res) => {
     if (!orgId) {
       return res.status(400).json({ error: 'org_id query param is required' });
     }
-    const pool = getOrgPool(orgId);
+    const orgSlug = await getOrgSlug(orgId);
+    if (!orgSlug) return res.status(404).json({ error: 'Organisation not found' });
+    const pool = getOrgPool(orgSlug);
     await pool.query('DELETE FROM api_tokens WHERE id = $1', [id]);
     return res.json({ success: true });
   } catch (err) {

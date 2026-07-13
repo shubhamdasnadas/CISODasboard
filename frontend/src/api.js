@@ -5,7 +5,13 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach JWT to every request if present
+// Restore active org from localStorage so the header survives page refreshes
+const _savedOrgId = localStorage.getItem('ciso_current_org_id');
+if (_savedOrgId) {
+  api.defaults.headers.common['X-Org-Id'] = _savedOrgId;
+}
+
+// Attach JWT + active org to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('ciso_token');
   if (token) {

@@ -139,7 +139,7 @@ function responsesForOrg(org) {
         ],
         total: 2,
       },
-      fetched_at: new Date(now - 15 * 60 * 1000),
+      fetched_at: new Date(now - 1 * 60 * 1000),
     },
     {
       api_name: 'CrowdStrike',
@@ -187,10 +187,10 @@ async function markSeeded(orgPool) {
 }
 
 async function seedOrg(org) {
-  const pool = getOrgPool(org.id);
+  const pool = getOrgPool(org.slug);
 
   if (await isSeeded(pool)) {
-    console.log(`✔  ciso_org_${org.id}: dummy data already seeded`);
+    console.log(`✔  ciso_org_${org.slug}: dummy data already seeded`);
     return { tokens: 0, responses: 0 };
   }
 
@@ -225,7 +225,7 @@ async function runSeedData() {
   // already creates it, but if the DB existed before that schema was added
   // we may need to create it on the fly.
   const { rows: orgs } = await centralPool.query(
-    'SELECT id, org_name FROM organisations ORDER BY id ASC'
+    'SELECT id, slug, org_name FROM organisations ORDER BY id ASC'
   );
 
   if (orgs.length === 0) {
@@ -236,7 +236,8 @@ async function runSeedData() {
   let totals = { tokens: 0, responses: 0 };
   for (const org of orgs) {
     try {
-      const pool = getOrgPool(org.id);
+      if (!org.slug) { console.warn(`⚠️  Skipped org ${org.id}: no slug`); continue; }
+      const pool = getOrgPool(org.slug);
       // Defensive: create the flag table if it doesn't exist yet.
       await pool.query(`
         CREATE TABLE IF NOT EXISTS _seed_done (
