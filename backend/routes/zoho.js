@@ -113,7 +113,7 @@ router.put('/credentials', async (req, res) => {
     if (!clientId || !clientSecret) {
       return res.status(400).json({ message: 'clientId and clientSecret are required' });
     }
-    // code is optional: it's single-use and expires quickly, so a save with no
+    // code is optional: it's single-use and expires quickly, so a save with nojknkjvndfkjnv
     // (or a stale) code just means credentials-sync will fall back to cached data.
     await req.orgPool.query(
       `INSERT INTO integration_credentials (integration, credentials, updated_at)
