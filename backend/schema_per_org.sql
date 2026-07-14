@@ -29,6 +29,19 @@ CREATE TABLE IF NOT EXISTS api_responses (
 
 CREATE INDEX IF NOT EXISTS idx_api_responses_api ON api_responses(api_name, fetched_at DESC);
 
+-- Org-specific OSINT query targets (domains/IPs/keywords) used to
+-- parameterize OSINT tool lookups instead of generic sample values.
+CREATE TABLE IF NOT EXISTS osint_watchlist (
+  id SERIAL PRIMARY KEY,
+  type TEXT NOT NULL CHECK (type IN ('domain','ip','keyword')),
+  value TEXT NOT NULL,
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(type, value)
+);
+
+CREATE INDEX IF NOT EXISTS idx_osint_watchlist_type ON osint_watchlist(type);
+
 -- Migration guards. These are flag tables (just one row = "yes, done").
 -- They MUST persist across restarts so we don't re-migrate / re-seed on
 -- every startup and create duplicate rows.

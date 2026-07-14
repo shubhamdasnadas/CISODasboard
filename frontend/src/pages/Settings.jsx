@@ -103,6 +103,48 @@ export default function Settings() {
     }
   };
 
+  // ── Zoho Desk ────────────────────────────────────────────────────────────
+  const [zhClientId, setZhClientId] = useState('');
+  const [zhClientSecret, setZhClientSecret] = useState('');
+  const [zhRedirectUri, setZhRedirectUri] = useState('');
+  const [zhOrgId, setZhOrgId] = useState('');
+  const [zhDomain, setZhDomain] = useState('');
+  const [zhCode, setZhCode] = useState('');
+  const [zhStatus, setZhStatus] = useState('idle'); // idle|saving|syncing|done|error
+  const [zhMsg, setZhMsg] = useState('');
+
+  useEffect(() => {
+    api.get('/zoho/credentials').then(r => {
+      if (r.data.clientId) setZhClientId(r.data.clientId);
+      if (r.data.clientSecret) setZhClientSecret(r.data.clientSecret);
+      if (r.data.redirectUri) setZhRedirectUri(r.data.redirectUri);
+      if (r.data.orgId) setZhOrgId(r.data.orgId);
+      if (r.data.domain) setZhDomain(r.data.domain);
+      if (r.data.code) setZhCode(r.data.code);
+    }).catch(() => {});
+  }, []);
+
+  const handleZohoSaveSync = async () => {
+    if (!zhClientId.trim() || !zhClientSecret.trim()) {
+      setZhMsg('Client ID and Client Secret are required'); setZhStatus('error'); return;
+    }
+    setZhStatus('saving'); setZhMsg('Saving credentials…');
+    try {
+      await api.put('/zoho/credentials', {
+        clientId: zhClientId.trim(), clientSecret: zhClientSecret.trim(),
+        redirectUri: zhRedirectUri.trim(), orgId: zhOrgId.trim(),
+        domain: zhDomain.trim(), code: zhCode.trim(),
+      });
+      setZhStatus('syncing'); setZhMsg('Syncing Zoho tickets…');
+      const r = await api.post('/zoho/credentials-sync');
+      setZhMsg(r.data.message || 'Sync complete');
+      setZhStatus(r.data.stale && !r.data.success ? 'error' : 'done');
+    } catch (err) {
+      setZhMsg(err.response?.data?.message || 'Sync failed');
+      setZhStatus('error');
+    }
+  };
+
   // ── Sync All ─────────────────────────────────────────────────────────────
   const [syncAllStatus, setSyncAllStatus] = useState('idle');
   const [syncStep, setSyncStep]           = useState(null);
@@ -359,6 +401,49 @@ export default function Settings() {
                 ) : 'Save & Sync'}
               </button>
               {cpMsg && <span className={`text-sm font-medium ${statusColor(cpStatus)}`}>{cpMsg}</span>}
+            </div>
+          </div>
+        </div>
+
+        {/* Zoho Desk */}
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center gap-3">
+            <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="font-semibold text-[var(--foreground)]">Zoho Desk</h3>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Support tickets — sync department/status data</p>
+            </div>
+          </div>
+          <div className="p-6 space-y-4">
+            {[
+              { label: 'Client ID', val: zhClientId, set: setZhClientId, ph: '1000.XXXXXXXXXX', type: 'text' },
+              { label: 'Client Secret', val: zhClientSecret, set: setZhClientSecret, ph: 'Zoho API console client secret', type: 'password' },
+              { label: 'Authorization Code (optional)', val: zhCode, set: setZhCode, ph: 'Single-use OAuth code — leave blank to keep showing cached data', type: 'password' },
+              { label: 'Redirect URI (optional)', val: zhRedirectUri, set: setZhRedirectUri, ph: 'https://your-app.com/oauthgrant', type: 'text' },
+              { label: 'Org ID (optional)', val: zhOrgId, set: setZhOrgId, ph: 'e.g. 60021258041', type: 'text' },
+              { label: 'Domain (optional)', val: zhDomain, set: setZhDomain, ph: 'https://desk.zoho.in', type: 'text' },
+            ].map(f => (
+              <div key={f.label}>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">{f.label}</label>
+                <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
+                  className="w-full px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            ))}
+            <p className="text-xs text-[var(--muted)]">
+              The authorization code is single-use and expires quickly. If it's left blank, already used, or expired, "Save & Sync" will keep showing the last successfully synced data instead of failing — paste in a fresh code from Zoho's OAuth consent screen whenever you want a live refresh.
+            </p>
+            <div className="flex items-center gap-4 pt-1">
+              <button onClick={handleZohoSaveSync} disabled={zhStatus === 'saving' || zhStatus === 'syncing'}
+                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
+                {zhStatus === 'saving' || zhStatus === 'syncing' ? (
+                  <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{zhStatus === 'saving' ? 'Saving…' : 'Syncing…'}</>
+                ) : 'Save & Sync'}
+              </button>
+              {zhMsg && <span className={`text-sm font-medium ${statusColor(zhStatus)}`}>{zhMsg}</span>}
             </div>
           </div>
         </div>

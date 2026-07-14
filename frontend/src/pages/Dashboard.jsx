@@ -21,6 +21,7 @@ import FwGraphWidget from './dashboard/FwGraphWidget.jsx';
 import S1ConfigWidget from './dashboard/S1ConfigWidget.jsx';
 import CheckpointWidgetPicker from './dashboard/CheckpointWidgetPicker.jsx';
 import SentinelOneWidgetPicker from './dashboard/SentinelOneWidgetPicker.jsx';
+import ZohoTicketMatrix from './zoho/ZohoTicketMatrix.jsx';
 
 // ── Small UI helpers ────────────────────────────────────────────────────────────
 function Spin() {
@@ -721,6 +722,13 @@ export default function Dashboard() {
         </div>
       )}
 
+      {/* ── Zoho Ticket Matrix ──────────────────────────────────────────────── */}
+
+      <div className="mt-8 mb-2">
+        <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Zoho Ticket Dashboard</h2>
+        <ZohoTicketMatrix />
+      </div>
+
       {/* ── Section Grid ────────────────────────────────────────────────────── */}
       <div className="flex flex-col divide-y divide-[var(--card-border)]">
         {sectionOrder.map((section) => {
@@ -1278,6 +1286,8 @@ export default function Dashboard() {
           </div>
         </div>
       ))}
+
+      
     </div>
   );
 }

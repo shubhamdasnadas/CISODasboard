@@ -2,25 +2,63 @@ import { useEffect, useState } from 'react';
 import api from '../api';
 import { Card, PageHeader, PrimaryButton, Badge } from '../components/UI.jsx';
 import { useOrg } from '../context/OrgContext.jsx';
+import WatchlistPanel from './osint/WatchlistPanel.jsx';
+import OsintKpiStrip from './osint/OsintKpiStrip.jsx';
+import GenericCard from './osint/GenericCard.jsx';
+import CrtShCard from './osint/CrtShCard.jsx';
+import VirusTotalCard from './osint/VirusTotalCard.jsx';
+import ShodanCard from './osint/ShodanCard.jsx';
+import VulnCard from './osint/VulnCard.jsx';
+import SanctionsCard from './osint/SanctionsCard.jsx';
+import PhishingCard from './osint/PhishingCard.jsx';
+import UrlScanCard from './osint/UrlScanCard.jsx';
+
+const CATEGORIES = ['Attack Surface', 'Vulnerability', 'Threat/IP Reputation', 'Phishing/Brand', 'Compliance/Sanctions'];
+
+function ToolCardBody({ tool, latest, history, screenedTerm }) {
+  switch (tool.id) {
+    case 'CrtSh': return <CrtShCard latest={latest} history={history} />;
+    case 'VirusTotal': return <VirusTotalCard latest={latest} history={history} />;
+    case 'Shodan': return <ShodanCard latest={latest} />;
+    case 'OSV':
+    case 'NVD': return <VulnCard toolId={tool.id} latest={latest} />;
+    case 'OpenSanctions': return <SanctionsCard latest={latest} screenedTerm={screenedTerm} />;
+    case 'PhishStats': return <PhishingCard latest={latest} history={history} />;
+    case 'UrlScan': return <UrlScanCard latest={latest} />;
+    default: return <GenericCard latest={latest} />;
+  }
+}
 
 export default function Osint() {
   const { currentOrg } = useOrg();
   const [tools, setTools] = useState([]);
   const [configuredApiNames, setConfiguredApiNames] = useState([]);
-  const [responses, setResponses] = useState({});
+  const [historyByTool, setHistoryByTool] = useState({});
+  const [watchlist, setWatchlist] = useState([]);
   const [fetchingId, setFetchingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
+
+  const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
+  const isAdmin = user.role === 'superAdmin' || user.role === 'admin';
 
   async function load() {
     if (!currentOrg) return;
     setLoading(true);
     try {
-      const { data } = await api.get(`/osint/${currentOrg.id}`);
-      setTools(data.tools || []);
-      setConfiguredApiNames(data.configuredApiNames || []);
-      const byName = {};
-      (data.responses || []).forEach((r) => { byName[r.api_name] = r; });
-      setResponses(byName);
+      const [{ data: osintData }, { data: wlData }] = await Promise.all([
+        api.get(`/osint/${currentOrg.id}`),
+        api.get(`/osint-watchlist/${currentOrg.id}`),
+      ]);
+      setTools(osintData.tools || []);
+      setConfiguredApiNames(osintData.configuredApiNames || []);
+      setWatchlist(wlData.watchlist || []);
+
+      const grouped = {};
+      (osintData.responses || []).forEach((r) => {
+        (grouped[r.api_name] ??= []).push(r);
+      });
+      setHistoryByTool(grouped);
     } finally {
       setLoading(false);
     }
@@ -36,7 +74,7 @@ export default function Osint() {
       if (data.configured === false) {
         setConfiguredApiNames((prev) => prev.filter((n) => n !== toolId));
       } else {
-        setResponses((prev) => ({ ...prev, [toolId]: data }));
+        setHistoryByTool((prev) => ({ ...prev, [toolId]: [...(prev[toolId] || []), data] }));
         setConfiguredApiNames((prev) => (prev.includes(toolId) ? prev : [...prev, toolId]));
       }
     } catch (err) {
@@ -54,6 +92,14 @@ export default function Osint() {
     );
   }
 
+  const latestByTool = {};
+  Object.entries(historyByTool).forEach(([id, arr]) => { latestByTool[id] = arr[arr.length - 1]; });
+  const allResponses = Object.values(historyByTool).flat();
+  const primaryKeyword = watchlist.find((w) => w.type === 'keyword' && w.is_primary)?.value
+    || watchlist.find((w) => w.type === 'keyword')?.value;
+
+  const visibleTools = tools.filter((t) => t.category === activeCategory);
+
   return (
     <div>
       <PageHeader
@@ -61,20 +107,42 @@ export default function Osint() {
         subtitle={currentOrg ? `Threat intel lookups for ${currentOrg.org_name}` : 'Threat intel lookups'}
       />
 
+      <WatchlistPanel orgId={currentOrg?.id} watchlist={watchlist} isAdmin={isAdmin} onChange={load} />
+
+      <OsintKpiStrip latestByTool={latestByTool} allResponses={allResponses} />
+
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => setActiveCategory(cat)}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              activeCategory === cat ? 'bg-accent text-white' : 'bg-navy-800 text-muted hover:bg-navy-700'
+            }`}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tools.map((tool) => {
+        {visibleTools.map((tool) => {
           const isConfigured = !tool.needsKey || configuredApiNames.includes(tool.id);
-          const response = responses[tool.id];
+          const history = historyByTool[tool.id] || [];
+          const latest = latestByTool[tool.id];
           const isFetching = fetchingId === tool.id;
 
           return (
             <Card key={tool.id}>
-              <div className="flex justify-between items-start mb-3 gap-2">
+              <div className="flex justify-between items-start mb-1 gap-2">
                 <div className="font-semibold">{tool.label}</div>
                 <Badge color={tool.needsKey ? 'accent' : 'green'}>
                   {tool.needsKey ? 'API key' : 'Free'}
                 </Badge>
               </div>
+              {tool.description && (
+                <div className="text-xs text-muted mb-3">{tool.description}</div>
+              )}
 
               {!isConfigured ? (
                 <div className="text-xs text-muted">
@@ -86,25 +154,10 @@ export default function Osint() {
               ) : (
                 <>
                   <PrimaryButton onClick={() => fetchTool(tool.id)} disabled={isFetching} className="mb-3">
-                    {isFetching ? 'Fetching…' : response ? '↻ Refresh' : 'Fetch'}
+                    {isFetching ? 'Fetching…' : latest ? '↻ Refresh' : 'Fetch'}
                   </PrimaryButton>
 
-                  {response ? (
-                    response.response_data?.error ? (
-                      <div className="text-xs text-rose-400">{response.response_data.message}</div>
-                    ) : (
-                      <>
-                        <div className="text-xs text-muted mb-2">
-                          Fetched: <Badge color="green">{new Date(response.fetched_at).toLocaleString()}</Badge>
-                        </div>
-                        <pre className="text-xs bg-navy-900 rounded-lg p-3 max-h-60 overflow-auto text-muted">
-                          {JSON.stringify(response.response_data?.data ?? response.data, null, 2)}
-                        </pre>
-                      </>
-                    )
-                  ) : (
-                    <div className="text-xs text-muted">Not fetched yet.</div>
-                  )}
+                  <ToolCardBody tool={tool} latest={latest} history={history} screenedTerm={primaryKeyword} />
                 </>
               )}
             </Card>

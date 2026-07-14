@@ -11,7 +11,7 @@ import requests
 
 from _common import print_header, print_result, print_error, print_footer
 
-DOMAIN = "example.com"  # sample domain to search
+DOMAIN = "youtube.com"  # sample domain to search
 URL = "https://crt.sh/"
 
 

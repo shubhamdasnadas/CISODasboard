@@ -15,6 +15,7 @@ const tokenRoutes = require('./routes/apiTokens');
 const { router: responseRoutes, fetchAndStore } = require('./routes/apiResponses');
 const healthRoutes = require('./routes/health');
 const osintRoutes = require('./routes/osint');
+const osintWatchlistRoutes = require('./routes/osintWatchlist');
 
 // Integration routes
 const { authMiddleware } = require('./middleware/authMiddleware');
@@ -57,6 +58,7 @@ app.use('/api/tokens', tokenRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/osint', osintRoutes);
+app.use('/api/osint-watchlist', osintWatchlistRoutes);
 
 // ─── Integration routes (auth + org context required) ─────────────────────────
 const withOrg = [authMiddleware, orgMiddleware];
