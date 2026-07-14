@@ -49,9 +49,9 @@ function Empty({ msg }) {
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8 };
 
 const NEWS_SECTIONS = [
-  { key: 'cyber',    q: 'cybersecurity',              label: 'Cybersecurity',           sublabel: 'News & Alerts',       gradientFrom: '#3b82f6', gradientTo: '#2563eb', textColor: 'text-blue-500',   bgColor: 'bg-blue-100 dark:bg-blue-900/40',   iconColor: 'text-blue-600 dark:text-blue-400',   lineFrom: 'from-blue-200 dark:from-blue-800'   },
-  { key: 'threats',  q: 'malware ransomware exploit', label: 'Threats & Vulnerabilities', sublabel: 'Attack Intelligence', gradientFrom: '#ef4444', gradientTo: '#dc2626', textColor: 'text-red-500',    bgColor: 'bg-red-100 dark:bg-red-900/40',     iconColor: 'text-red-600 dark:text-red-400',     lineFrom: 'from-red-200 dark:from-red-800'     },
-  { key: 'breaches', q: 'data breach hack leak',      label: 'Data Breaches',           sublabel: 'Incidents',           gradientFrom: '#f97316', gradientTo: '#ea580c', textColor: 'text-orange-500', bgColor: 'bg-orange-100 dark:bg-orange-900/40', iconColor: 'text-orange-600 dark:text-orange-400', lineFrom: 'from-orange-200 dark:from-orange-800' },
+  { key: 'cyber', q: 'cybersecurity', label: 'Cybersecurity', sublabel: 'News & Alerts', gradientFrom: '#3b82f6', gradientTo: '#2563eb', textColor: 'text-blue-500', bgColor: 'bg-blue-100 dark:bg-blue-900/40', iconColor: 'text-blue-600 dark:text-blue-400', lineFrom: 'from-blue-200 dark:from-blue-800' },
+  { key: 'threats', q: 'malware ransomware exploit', label: 'Threats & Vulnerabilities', sublabel: 'Attack Intelligence', gradientFrom: '#ef4444', gradientTo: '#dc2626', textColor: 'text-red-500', bgColor: 'bg-red-100 dark:bg-red-900/40', iconColor: 'text-red-600 dark:text-red-400', lineFrom: 'from-red-200 dark:from-red-800' },
+  { key: 'breaches', q: 'data breach hack leak', label: 'Data Breaches', sublabel: 'Incidents', gradientFrom: '#f97316', gradientTo: '#ea580c', textColor: 'text-orange-500', bgColor: 'bg-orange-100 dark:bg-orange-900/40', iconColor: 'text-orange-600 dark:text-orange-400', lineFrom: 'from-orange-200 dark:from-orange-800' },
 ];
 
 function NewsSkeletonCard() {
@@ -96,19 +96,19 @@ function NewsArticleCard({ article }) {
 
 function mapCpEvent(e) {
   return {
-    eventId:             e.event_id,
-    type:                e.type,
-    state:               e.state,
-    severity:            e.severity,
+    eventId: e.event_id,
+    type: e.type,
+    state: e.state,
+    severity: e.severity,
     confidenceIndicator: e.confidence_indicator,
-    description:         e.description,
-    senderAddress:       e.sender_address,
-    saas:                e.saas,
-    entityId:            e.entity_id,
-    entityLink:          e.entity_link,
-    additionalData:      e.additional_data,
-    actions:             e.actions,
-    eventCreated:        e.event_created,
+    description: e.description,
+    senderAddress: e.sender_address,
+    saas: e.saas,
+    entityId: e.entity_id,
+    entityLink: e.entity_link,
+    additionalData: e.additional_data,
+    actions: e.actions,
+    eventCreated: e.event_created,
   };
 }
 
@@ -117,87 +117,87 @@ export default function Dashboard() {
   const { currentOrg } = useOrg();
 
   // ── S1 data ─────────────────────────────────────────────────────────────────
-  const [s1Data,            setS1Data]            = useState([]);
-  const [s1Loading,         setS1Loading]          = useState(true);
-  const [s1Error]                                  = useState('');
-  const [agentData,         setAgentData]          = useState([]);
-  const [agentLoading,      setAgentLoading]       = useState(true);
-  const [agentError]                               = useState('');
-  const [appAgentData,      setAppAgentData]       = useState([]);
-  const [appAgentLoading,   setAppAgentLoading]    = useState(true);
-  const [appCveData,        setAppCveData]         = useState([]);
-  const [appCveLoading,     setAppCveLoading]      = useState(true);
-  const [deviceControlData, setDeviceControlData]  = useState([]);
+  const [s1Data, setS1Data] = useState([]);
+  const [s1Loading, setS1Loading] = useState(true);
+  const [s1Error] = useState('');
+  const [agentData, setAgentData] = useState([]);
+  const [agentLoading, setAgentLoading] = useState(true);
+  const [agentError] = useState('');
+  const [appAgentData, setAppAgentData] = useState([]);
+  const [appAgentLoading, setAppAgentLoading] = useState(true);
+  const [appCveData, setAppCveData] = useState([]);
+  const [appCveLoading, setAppCveLoading] = useState(true);
+  const [deviceControlData, setDeviceControlData] = useState([]);
   const [deviceControlLoading, setDeviceControlLoading] = useState(true);
-  const [rssData,           setRssData]            = useState([]);
-  const [rssLoading,        setRssLoading]         = useState(true);
-  const [mitigationChart,   setMitigationChart]    = useState('donut');
+  const [rssData, setRssData] = useState([]);
+  const [rssLoading, setRssLoading] = useState(true);
+  const [mitigationChart, setMitigationChart] = useState('donut');
 
   // ── Checkpoint ──────────────────────────────────────────────────────────────
-  const [cpEvents,         setCpEvents]         = useState([]);
-  const [cpEventsLoading,  setCpEventsLoading]  = useState(true);
+  const [cpEvents, setCpEvents] = useState([]);
+  const [cpEventsLoading, setCpEventsLoading] = useState(true);
 
   // ── Firewall ─────────────────────────────────────────────────────────────────
-  const [fwWidgets,   setFwWidgets]   = useState([]);
-  const [fwReport,    setFwReport]    = useState('bandwidth-trend');
-  const [fwRaw,       setFwRaw]       = useState(null);
-  const [fwLoading,   setFwLoading]   = useState(false);
-  const [fwError,     setFwError]     = useState('');
-  const [fwXAxis,     setFwXAxis]     = useState([]);
-  const [fwYAxis,     setFwYAxis]     = useState([]);
+  const [fwWidgets, setFwWidgets] = useState([]);
+  const [fwReport, setFwReport] = useState('bandwidth-trend');
+  const [fwRaw, setFwRaw] = useState(null);
+  const [fwLoading, setFwLoading] = useState(false);
+  const [fwError, setFwError] = useState('');
+  const [fwXAxis, setFwXAxis] = useState([]);
+  const [fwYAxis, setFwYAxis] = useState([]);
   const [fwChartType, setFwChartType] = useState('bar');
-  const [showFwX,     setShowFwX]     = useState(false);
-  const [showFwY,     setShowFwY]     = useState(false);
-  const [collecting,  setCollecting]  = useState(false);
-  const [collectMsg,  setCollectMsg]  = useState(null);
+  const [showFwX, setShowFwX] = useState(false);
+  const [showFwY, setShowFwY] = useState(false);
+  const [collecting, setCollecting] = useState(false);
+  const [collectMsg, setCollectMsg] = useState(null);
 
   // ── S1 sync ──────────────────────────────────────────────────────────────────
-  const [s1Syncing,  setS1Syncing]  = useState(false);
-  const [s1SyncMsg,  setS1SyncMsg]  = useState(null);
+  const [s1Syncing, setS1Syncing] = useState(false);
+  const [s1SyncMsg, setS1SyncMsg] = useState(null);
 
   // ── News ─────────────────────────────────────────────────────────────────────
-  const [newsData,    setNewsData]    = useState({ cyber: [], threats: [], breaches: [] });
+  const [newsData, setNewsData] = useState({ cyber: [], threats: [], breaches: [] });
   const [newsLoading, setNewsLoading] = useState({ cyber: true, threats: true, breaches: true });
 
   // ── Grid layout ──────────────────────────────────────────────────────────────
-  const [boxes,               setBoxes]               = useState(DEFAULT_BOXES);
-  const [layoutLoaded,        setLayoutLoaded]         = useState(false);
-  const [activeGridBreakpoint,setActiveGridBreakpoint] = useState('lg');
-  const [saving,              setSaving]               = useState(false);
-  const [saved,               setSaved]                = useState(false);
+  const [boxes, setBoxes] = useState(DEFAULT_BOXES);
+  const [layoutLoaded, setLayoutLoaded] = useState(false);
+  const [activeGridBreakpoint, setActiveGridBreakpoint] = useState('lg');
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const saveTimerRef = useRef(null);
 
   // ── Edit mode / Add Widget modal ──────────────────────────────────────────────
-  const [isEditMode,   setIsEditMode]   = useState(false);
-  const [showAddWidget,setShowAddWidget] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [showAddWidget, setShowAddWidget] = useState(false);
   const [widgetSource, setWidgetSource] = useState('firewall');
-  const [cpSelected,   setCpSelected]   = useState([]);
-  const [s1Selected,   setS1Selected]   = useState([]);
+  const [cpSelected, setCpSelected] = useState([]);
+  const [s1Selected, setS1Selected] = useState([]);
 
   // ── Section ordering ─────────────────────────────────────────────────────────
   const [sectionOrder, setSectionOrder] = useState(['checkpoint', 'sentinelone', 'firewall']);
   const sectionOrderRef = useRef(['checkpoint', 'sentinelone', 'firewall']);
-  const dragSectionRef  = useRef(null);
+  const dragSectionRef = useRef(null);
 
   // ── Visible widget sets ───────────────────────────────────────────────────────
-  const [visibleS1Widgets,  setVisibleS1Widgets]  = useState(['s1-mitigation', 's1-severity', 's1-threats', 's1-agents']);
-  const [s1WidgetConfigs,   setS1WidgetConfigs]   = useState({
-    's1-mitigation':     { id: 's1-mitigation',     viewMode: 'stat' },
-    's1-severity':       { id: 's1-severity',       viewMode: 'stat' },
-    's1-threats':        { id: 's1-threats',        viewMode: 'table' },
-    's1-agents':         { id: 's1-agents',         viewMode: 'table' },
+  const [visibleS1Widgets, setVisibleS1Widgets] = useState(['s1-mitigation', 's1-severity', 's1-threats', 's1-agents']);
+  const [s1WidgetConfigs, setS1WidgetConfigs] = useState({
+    's1-mitigation': { id: 's1-mitigation', viewMode: 'stat' },
+    's1-severity': { id: 's1-severity', viewMode: 'stat' },
+    's1-threats': { id: 's1-threats', viewMode: 'table' },
+    's1-agents': { id: 's1-agents', viewMode: 'table' },
   });
   const [visibleCpWidgets, setVisibleCpWidgets] = useState([]);
 
   // keep refs in sync for debounced persist
-  const visibleS1Ref     = useRef(['s1-mitigation', 's1-severity', 's1-threats', 's1-agents']);
-  const s1ConfigsRef     = useRef(s1WidgetConfigs);
-  const visibleCpRef     = useRef([]);
+  const visibleS1Ref = useRef(['s1-mitigation', 's1-severity', 's1-threats', 's1-agents']);
+  const s1ConfigsRef = useRef(s1WidgetConfigs);
+  const visibleCpRef = useRef([]);
 
-  useEffect(() => { visibleS1Ref.current    = visibleS1Widgets;  }, [visibleS1Widgets]);
-  useEffect(() => { s1ConfigsRef.current    = s1WidgetConfigs;   }, [s1WidgetConfigs]);
-  useEffect(() => { visibleCpRef.current    = visibleCpWidgets;  }, [visibleCpWidgets]);
-  useEffect(() => { sectionOrderRef.current = sectionOrder;       }, [sectionOrder]);
+  useEffect(() => { visibleS1Ref.current = visibleS1Widgets; }, [visibleS1Widgets]);
+  useEffect(() => { s1ConfigsRef.current = s1WidgetConfigs; }, [s1WidgetConfigs]);
+  useEffect(() => { visibleCpRef.current = visibleCpWidgets; }, [visibleCpWidgets]);
+  useEffect(() => { sectionOrderRef.current = sectionOrder; }, [sectionOrder]);
 
   // ── Container width (for react-grid-layout) ───────────────────────────────────
   const [containerWidth, setContainerWidth] = useState(typeof window !== 'undefined' ? window.innerWidth - 240 : 1200);
@@ -226,12 +226,12 @@ export default function Dashboard() {
           pgboxes: nextBoxes,
           sectionOrder: orderToSave,
           visibleS1Widgets: visibleS1Ref.current,
-          s1WidgetConfigs:  s1ConfigsRef.current,
+          s1WidgetConfigs: s1ConfigsRef.current,
           visibleCpWidgets: visibleCpRef.current,
         },
       })
         .then(() => { setSaved(true); setTimeout(() => setSaved(false), 2500); })
-        .catch(() => {})
+        .catch(() => { })
         .finally(() => setSaving(false));
     }, 800);
   }, []);
@@ -268,12 +268,12 @@ export default function Dashboard() {
         setLayoutLoaded(true);
 
         // S1
-        if (Array.isArray(agg.sentinelone?.threats))          setS1Data(agg.sentinelone.threats);
-        if (Array.isArray(agg.sentinelone?.agents))           setAgentData(agg.sentinelone.agents);
+        if (Array.isArray(agg.sentinelone?.threats)) setS1Data(agg.sentinelone.threats);
+        if (Array.isArray(agg.sentinelone?.agents)) setAgentData(agg.sentinelone.agents);
         if (Array.isArray(agg.sentinelone?.applicationAgent)) setAppAgentData(agg.sentinelone.applicationAgent);
-        if (Array.isArray(agg.sentinelone?.applicationCve))   setAppCveData(agg.sentinelone.applicationCve);
-        if (Array.isArray(agg.sentinelone?.deviceControl))    setDeviceControlData(agg.sentinelone.deviceControl);
-        if (Array.isArray(agg.sentinelone?.rss))              setRssData(agg.sentinelone.rss);
+        if (Array.isArray(agg.sentinelone?.applicationCve)) setAppCveData(agg.sentinelone.applicationCve);
+        if (Array.isArray(agg.sentinelone?.deviceControl)) setDeviceControlData(agg.sentinelone.deviceControl);
+        if (Array.isArray(agg.sentinelone?.rss)) setRssData(agg.sentinelone.rss);
 
         // Harmony
         if (Array.isArray(agg.harmony?.events)) setCpEvents(agg.harmony.events.map(mapCpEvent));
@@ -342,7 +342,7 @@ export default function Dashboard() {
     setSectionOrder((prev) => {
       const next = [...prev];
       const from = next.indexOf(dragged);
-      const to   = next.indexOf(target);
+      const to = next.indexOf(target);
       next.splice(from, 1);
       next.splice(to, 0, dragged);
       sectionOrderRef.current = next;
@@ -366,7 +366,7 @@ export default function Dashboard() {
       const l = layoutToSave.find((n) => n.i === widget.id);
       if (!l) return widget;
       const next = clampLayoutItem({ ...widget, x: l.x, y: l.y, w: l.w, h: l.h }, GRID_COLS.lg);
-      api.put(`/firewall/widgets/${widget.id}`, { x: next.x, y: next.y, w: next.w, h: next.h }).catch(() => {});
+      api.put(`/firewall/widgets/${widget.id}`, { x: next.x, y: next.y, w: next.w, h: next.h }).catch(() => { });
       return next;
     }));
     setBoxes(nextBoxes);
@@ -422,7 +422,7 @@ export default function Dashboard() {
   }
 
   async function handleDeleteFwWidget(id) {
-    await api.delete(`/firewall/widgets/${id}`).catch(() => {});
+    await api.delete(`/firewall/widgets/${id}`).catch(() => { });
     setFwWidgets((prev) => prev.filter((w) => w.id !== id));
   }
 
@@ -451,18 +451,18 @@ export default function Dashboard() {
   // ── Derived data ───────────────────────────────────────────────────────────────
   const mitigationCounts = {};
   s1Data.forEach((t) => { const s = t.threatInfo?.mitigationStatus || 'unknown'; mitigationCounts[s] = (mitigationCounts[s] || 0) + 1; });
-  const mitigationData  = Object.entries(mitigationCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
+  const mitigationData = Object.entries(mitigationCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
   const mitigationTotal = mitigationData.reduce((s, d) => s + d.value, 0);
 
   const severityCounts = {};
   s1Data.forEach((t) => { const s = t.threatInfo?.confidenceLevel || 'unknown'; severityCounts[s] = (severityCounts[s] || 0) + 1; });
   const severityData = Object.entries(severityCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
 
-  const recentThreats  = [...s1Data].sort((a, b) => new Date(b.threatInfo?.createdAt || 0) - new Date(a.threatInfo?.createdAt || 0)).slice(0, 15);
-  const activeAgents   = agentData.filter((a) => a.isActive).length;
+  const recentThreats = [...s1Data].sort((a, b) => new Date(b.threatInfo?.createdAt || 0) - new Date(a.threatInfo?.createdAt || 0)).slice(0, 15);
+  const activeAgents = agentData.filter((a) => a.isActive).length;
   const inactiveAgents = agentData.filter((a) => !a.isActive).length;
 
-  const fwTable   = fwRaw ? extractTable(fwRaw) : null;
+  const fwTable = fwRaw ? extractTable(fwRaw) : null;
   const fwColumns = fwTable?.columns ?? [];
 
   // ── Grid items ─────────────────────────────────────────────────────────────────
@@ -501,7 +501,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {saving && <span className="text-xs text-[var(--muted)] flex items-center gap-1.5"><div className="animate-spin w-3 h-3 border-2 border-indigo-400 border-t-transparent rounded-full" />Saving…</span>}
-          {saved  && <span className="text-xs text-green-600 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Saved</span>}
+          {saved && <span className="text-xs text-green-600 flex items-center gap-1"><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>Saved</span>}
           <button
             onClick={() => isEditMode ? handleDoneEditing() : setIsEditMode(true)}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${isEditMode ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-[var(--card-bg)] text-[var(--foreground)] border-[var(--card-border)] hover:border-indigo-400 hover:text-indigo-600'}`}
@@ -552,15 +552,15 @@ export default function Dashboard() {
             {/* Tab bar */}
             <div className="flex border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
               {[
-                { key: 'checkpoint',  label: 'Checkpoint',         color: 'indigo',  icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
-                { key: 'sentinelone', label: 'SentinelOne',        color: 'emerald', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
-                { key: 'firewall',    label: 'Palo Alto Firewall', color: 'orange',  icon: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z' },
+                { key: 'checkpoint', label: 'Checkpoint', color: 'indigo', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                { key: 'sentinelone', label: 'SentinelOne', color: 'emerald', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' },
+                { key: 'firewall', label: 'Palo Alto Firewall', color: 'orange', icon: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z' },
               ].map((tab) => {
                 const isActive = widgetSource === tab.key;
                 const clsMap = {
-                  indigo:  isActive ? 'border-b-2 border-indigo-500 text-indigo-600 bg-[var(--card-bg)]'  : 'text-[var(--muted)] hover:text-indigo-500 hover:bg-[var(--card-bg)]',
-                  emerald: isActive ? 'border-b-2 border-emerald-500 text-emerald-600 bg-[var(--card-bg)]': 'text-[var(--muted)] hover:text-emerald-500 hover:bg-[var(--card-bg)]',
-                  orange:  isActive ? 'border-b-2 border-orange-500 text-orange-600 bg-[var(--card-bg)]'  : 'text-[var(--muted)] hover:text-orange-500 hover:bg-[var(--card-bg)]',
+                  indigo: isActive ? 'border-b-2 border-indigo-500 text-indigo-600 bg-[var(--card-bg)]' : 'text-[var(--muted)] hover:text-indigo-500 hover:bg-[var(--card-bg)]',
+                  emerald: isActive ? 'border-b-2 border-emerald-500 text-emerald-600 bg-[var(--card-bg)]' : 'text-[var(--muted)] hover:text-emerald-500 hover:bg-[var(--card-bg)]',
+                  orange: isActive ? 'border-b-2 border-orange-500 text-orange-600 bg-[var(--card-bg)]' : 'text-[var(--muted)] hover:text-orange-500 hover:bg-[var(--card-bg)]',
                 };
                 return (
                   <button key={tab.key} onClick={() => setWidgetSource(tab.key)}
@@ -722,12 +722,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* ── Zoho Ticket Matrix ──────────────────────────────────────────────── */}
 
-      <div className="mt-8 mb-2">
-        <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Zoho Ticket Dashboard</h2>
-        <ZohoTicketMatrix />
-      </div>
 
       {/* ── Section Grid ────────────────────────────────────────────────────── */}
       <div className="flex flex-col divide-y divide-[var(--card-border)]">
@@ -772,12 +767,12 @@ export default function Dashboard() {
                     {visibleCpWidgets.map((id, idx) => {
                       const opt = WIDGET_OPTIONS.find((w) => w.id === id);
                       if (!opt) return null;
-                      const filtered    = cpEvents.filter((e) => opt.eventTypes.includes(e.type));
-                      const total       = filtered.length;
-                      const pending     = filtered.filter((e) => e.state === 'new' || e.state === 'pending').length;
-                      const remediated  = filtered.filter((e) => ['remediated', 'closed', 'done'].includes(e.state)).length;
-                      const remPct      = total > 0 ? Math.round((remediated / total) * 100) : 0;
-                      const pendPct     = total > 0 ? Math.round((pending    / total) * 100) : 0;
+                      const filtered = cpEvents.filter((e) => opt.eventTypes.includes(e.type));
+                      const total = filtered.length;
+                      const pending = filtered.filter((e) => e.state === 'new' || e.state === 'pending').length;
+                      const remediated = filtered.filter((e) => ['remediated', 'closed', 'done'].includes(e.state)).length;
+                      const remPct = total > 0 ? Math.round((remediated / total) * 100) : 0;
+                      const pendPct = total > 0 ? Math.round((pending / total) * 100) : 0;
                       return (
                         <div key={id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" style={{ animationDelay: `${idx * 60}ms` }}>
                           <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-indigo-50 to-transparent dark:from-indigo-900/20 dark:to-transparent border-b border-[var(--card-border)]">
@@ -1007,8 +1002,8 @@ export default function Dashboard() {
                                 const status = t.threatInfo?.mitigationStatus || 'unknown';
                                 const cls = status === 'mitigated' ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
                                   : status === 'active' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
-                                  : status === 'not_mitigated' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
-                                  : 'bg-[var(--muted-bg)] text-[var(--muted)]';
+                                    : status === 'not_mitigated' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                                      : 'bg-[var(--muted-bg)] text-[var(--muted)]';
                                 return (
                                   <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
                                     <td className="px-3 py-2 border-b border-[var(--card-border)]">
@@ -1145,9 +1140,9 @@ export default function Dashboard() {
                           <div className="divide-y divide-[var(--card-border)]">
                             {rssData.slice(0, 20).map((item, i) => {
                               const title = item.title || item.name || 'Untitled';
-                              const desc  = item.summary || item.description || item.content || '';
-                              const link  = item.link || item.url || item.guid || null;
-                              const date  = item.published || item.pubDate || item.date || '';
+                              const desc = item.summary || item.description || item.content || '';
+                              const link = item.link || item.url || item.guid || null;
+                              const date = item.published || item.pubDate || item.date || '';
                               const image = item?.media_thumbnail ?? item?.enclosure?.url ?? item?.image?.url ?? item?.thumbnail ?? null;
                               const displayDate = date ? new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
                               return (
@@ -1174,82 +1169,88 @@ export default function Dashboard() {
           );
 
           /* ─ FIREWALL ─ */
-          return (
-            <div key="firewall" onDragOver={(e) => { e.preventDefault(); moveSection('firewall'); }} className="group/sec">
-              <div className="pt-4 pb-5 relative z-10">
-                {/* Section header */}
-                <div
-                  draggable
-                  onDragStart={(e) => { e.stopPropagation(); dragSectionRef.current = 'firewall'; }}
-                  onDragEnd={(e) => { e.stopPropagation(); dragSectionRef.current = null; }}
-                  className="flex items-center gap-3 mb-3 cursor-move select-none rounded-xl px-3 py-2 transition-all duration-200 hover:bg-orange-50/50 dark:hover:bg-orange-900/10"
-                >
-                  <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 flex-shrink-0 shadow-sm" />
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none">Network</p>
-                      <h2 className="text-sm font-bold text-[var(--foreground)] leading-tight">Palo Alto Firewall</h2>
-                    </div>
-                  </div>
-                  <div className="flex-1 h-px bg-gradient-to-r from-orange-200 via-[var(--card-border)] to-transparent dark:from-orange-800" />
-                  <button onClick={(e) => { e.stopPropagation(); handleCollect(); }} disabled={collecting}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-all duration-150 flex-shrink-0 border border-orange-200 dark:border-orange-700">
-                    {collecting
-                      ? <><div className="animate-spin w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full" />Collecting…</>
-                      : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Collect</>
-                    }
-                  </button>
-                </div>
+          // return (
+          //   <div key="firewall" onDragOver={(e) => { e.preventDefault(); moveSection('firewall'); }} className="group/sec">
+          //     <div className="pt-4 pb-5 relative z-10">
+          //       {/* Section header */}
+          //       <div
+          //         draggable
+          //         onDragStart={(e) => { e.stopPropagation(); dragSectionRef.current = 'firewall'; }}
+          //         onDragEnd={(e) => { e.stopPropagation(); dragSectionRef.current = null; }}
+          //         className="flex items-center gap-3 mb-3 cursor-move select-none rounded-xl px-3 py-2 transition-all duration-200 hover:bg-orange-50/50 dark:hover:bg-orange-900/10"
+          //       >
+          //         <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 flex-shrink-0 shadow-sm" />
+          //         <div className="flex items-center gap-2">
+          //           <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+          //             <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
+          //           </div>
+          //           <div>
+          //             <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none">Network</p>
+          //             <h2 className="text-sm font-bold text-[var(--foreground)] leading-tight">Palo Alto Firewall</h2>
+          //           </div>
+          //         </div>
+          //         <div className="flex-1 h-px bg-gradient-to-r from-orange-200 via-[var(--card-border)] to-transparent dark:from-orange-800" />
+          //         <button onClick={(e) => { e.stopPropagation(); handleCollect(); }} disabled={collecting}
+          //           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-all duration-150 flex-shrink-0 border border-orange-200 dark:border-orange-700">
+          //           {collecting
+          //             ? <><div className="animate-spin w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full" />Collecting…</>
+          //             : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Collect</>
+          //           }
+          //         </button>
+          //       </div>
 
-                {collectMsg && (
-                  <div className={`mb-3 px-3 py-2 rounded-lg text-xs border flex items-center gap-2 ${collectMsg.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
-                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collectMsg.ok ? 'M5 13l4 4L19 7' : 'M12 9v2m0 4h.01'} /></svg>
-                    {collectMsg.text}
-                  </div>
-                )}
-              </div>
+          //       {collectMsg && (
+          //         <div className={`mb-3 px-3 py-2 rounded-lg text-xs border flex items-center gap-2 ${collectMsg.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+          //           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collectMsg.ok ? 'M5 13l4 4L19 7' : 'M12 9v2m0 4h.01'} /></svg>
+          //           {collectMsg.text}
+          //         </div>
+          //       )}
+          //     </div>
 
-              {/* Firewall widget grid */}
-              {fwWidgets.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-orange-200 dark:border-orange-800 rounded-2xl bg-orange-50/30 dark:bg-orange-900/10 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center mb-3">
-                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" /></svg>
-                  </div>
-                  <p className="text-sm font-semibold text-[var(--foreground)] mb-1">No firewall widgets</p>
-                  <p className="text-xs text-[var(--muted)]">Click "Add Widget" → Palo Alto Firewall to create charts</p>
-                </div>
-              ) : (
-                <div className="w-full min-w-0" onDragStart={(e) => e.stopPropagation()}>
-                  <ResponsiveGridLayout
-                    className="layout"
-                    layouts={fwLayouts}
-                    breakpoints={GRID_BREAKPOINTS}
-                    cols={GRID_COLS}
-                    rowHeight={10}
-                    width={containerWidth}
-                    onLayoutChange={handleLayoutChange}
-                    onBreakpointChange={(bp) => setActiveGridBreakpoint(bp)}
-                    compactor={noCompactor}
-                    dragConfig={{ enabled: isEditMode, handle: '.drag-handle' }}
-                    resizeConfig={{ enabled: isEditMode, handles: ['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'] }}
-                    margin={[10, 10]}
-                  >
-                    {fwWidgets.map((widget) => (
-                      <div key={widget.id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden">
-                        <FwGraphWidget widget={widget} onDelete={handleDeleteFwWidget} isEditMode={isEditMode} />
-                      </div>
-                    ))}
-                  </ResponsiveGridLayout>
-                </div>
-              )}
-            </div>
-          );
+          //     {/* Firewall widget grid */}
+          //     {fwWidgets.length === 0 ? (
+          //       <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-orange-200 dark:border-orange-800 rounded-2xl bg-orange-50/30 dark:bg-orange-900/10 mb-4">
+          //         <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center mb-3">
+          //           <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" /></svg>
+          //         </div>
+          //         <p className="text-sm font-semibold text-[var(--foreground)] mb-1">No firewall widgets</p>
+          //         <p className="text-xs text-[var(--muted)]">Click "Add Widget" → Palo Alto Firewall to create charts</p>
+          //       </div>
+          //     ) : (
+          //       <div className="w-full min-w-0" onDragStart={(e) => e.stopPropagation()}>
+          //         <ResponsiveGridLayout
+          //           className="layout"
+          //           layouts={fwLayouts}
+          //           breakpoints={GRID_BREAKPOINTS}
+          //           cols={GRID_COLS}
+          //           rowHeight={10}
+          //           width={containerWidth}
+          //           onLayoutChange={handleLayoutChange}
+          //           onBreakpointChange={(bp) => setActiveGridBreakpoint(bp)}
+          //           compactor={noCompactor}
+          //           dragConfig={{ enabled: isEditMode, handle: '.drag-handle' }}
+          //           resizeConfig={{ enabled: isEditMode, handles: ['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'] }}
+          //           margin={[10, 10]}
+          //         >
+          //           {fwWidgets.map((widget) => (
+          //             <div key={widget.id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden">
+          //               <FwGraphWidget widget={widget} onDelete={handleDeleteFwWidget} isEditMode={isEditMode} />
+          //             </div>
+          //           ))}
+          //         </ResponsiveGridLayout>
+          //       </div>
+          //     )}
+          //   </div>
+          // );
         })}
       </div>
 
+      {/* ── Zoho Ticket Matrix ──────────────────────────────────────────────── */}
+
+      <div className="mt-8 mb-2">
+        <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Zoho Ticket Dashboard</h2>
+        <ZohoTicketMatrix />
+      </div>
       {/* ── News Sections ───────────────────────────────────────────────────── */}
       {NEWS_SECTIONS.map((section) => (
         <div key={section.key} className="mt-8 mb-2">
@@ -1287,7 +1288,7 @@ export default function Dashboard() {
         </div>
       ))}
 
-      
+
     </div>
   );
 }

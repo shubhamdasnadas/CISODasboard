@@ -301,7 +301,7 @@ export default function PaloAltoPage() {
             <KpiCard title="Total Sessions" value={formatNumber(dashboard.totalSessions)} subtitle="nsess / session count" icon="📊" color="#3b82f6" />
             <KpiCard title="Total Traffic" value={formatBytes(dashboard.totalTraffic)} subtitle="nbytes total traffic" icon="🌐" color="#06b6d4" />
             <KpiCard title="High Risk Events" value={formatNumber(dashboard.highRiskEvents)} subtitle="Risk 4 + Risk 5" icon="🔴" color="#ef4444" />
-            <KpiCard title="Top Destination" value={dashboard.topDestination} subtitle="Highest attacker destination" icon="🎯" color="#0f766e" />
+            <KpiCard title="Top Destination" value={dashboard.topDestination} subtitle="" icon="🎯" color="#0f766e" />
             <KpiCard title="Security Score" value={`${dashboard.securityScore}/100`} subtitle={scoreStatus.label} icon="✅" color={scoreStatus.color} />
           </div>
 
