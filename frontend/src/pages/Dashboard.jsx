@@ -412,7 +412,7 @@ export default function Dashboard() {
   // ── Add firewall widget ────────────────────────────────────────────────────────
   async function handleAddFwWidget() {
     if (!fwXAxis.length || !fwYAxis.length) return;
-    const nextY = Math.max(46, ...fwWidgets.map((w) => Number(w.y ?? 0) + Number(w.h ?? 44)));
+    const nextY = fwWidgets.length > 0 ? Math.max(...fwWidgets.map((w) => Number(w.y ?? 0) + Number(w.h ?? 44))) : 0;
     const payload = { reportName: fwReport, xAxis: fwXAxis, yAxis: fwYAxis, chartType: fwYAxis.length > 1 ? 'mixed' : fwChartType, x: 0, y: nextY, w: 7, h: 44 };
     const r = await api.post('/firewall/widgets', payload);
     if (r.status < 400 && r.data?.widget) {
