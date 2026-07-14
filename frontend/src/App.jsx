@@ -26,7 +26,6 @@ import RiskyEndpoint from './pages/security/RiskyEndpoint.jsx';
 // Integrations
 import PaloAltoPage from './pages/paloalto/PaloAltoPage.jsx';
 import CheckpointPage from './pages/checkpoint/CheckpointPage.jsx';
-import ZohoPage from './pages/zoho/ZohoPage.jsx';
 import Zohoone from './pages/zoho/zohoOne/Zohoone.jsx';
 
 // Operations
@@ -120,7 +119,7 @@ export default function App() {
             {/* Integrations */}
             <Route path="/paloalto"        element={<PaloAltoPage />} />
             <Route path="/checkpoint"      element={<CheckpointPage />} />
-            <Route path="/zoho"            element={<ZohoPage />} />
+            <Route path="/zoho"            element={<Zohoone />} />
             <Route path="/zoho/one"        element={<Zohoone />} />
 
             {/* Members */}
