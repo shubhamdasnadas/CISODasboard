@@ -283,9 +283,6 @@ export default function PaloAltoPage() {
     setLoading(true);
     setError('');
     try {
-      const params = buildQueryParams(globalDateRange);
-      const queryString = params ? `?${params}` : '';
-      
       const results = await Promise.allSettled(
         REPORTS_TO_FETCH.map(name =>
           api.get(`/firewall/reports/${name}`).then(r => {
