@@ -257,6 +257,7 @@ export default function Threats() {
 
   const mitreData = useMemo(() => {
     const c = {};
+  
     threats.forEach((t) => {
       // A threat can list the same technique across multiple indicator
       // entries — dedupe per threat so counts match DetailView's per-threat
