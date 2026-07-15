@@ -1,11 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api.js';
 
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8, fontSize: 12 };
 
-function KpiCard({ title, value, subtitle, accent }) {
+function KpiCard({ title, value, subtitle, accent, onClick }) {
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
+    <div
+      onClick={onClick}
+      className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+    >
       <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-widest">{title}</p>
       <p className="text-3xl font-bold" style={{ color: accent }}>{value}</p>
       {subtitle && <p className="text-[11px] text-[var(--muted)]">{subtitle}</p>}
@@ -70,6 +74,7 @@ function ProgressBar({ value, max, color = '#6366f1' }) {
 }
 
 export default function S1Agent() {
+  const navigate = useNavigate();
   const [agents, setAgents]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [openUser, setOpenUser] = useState(null);
@@ -205,7 +210,8 @@ export default function S1Agent() {
         <KpiCard title="Total Agents"   value={kpis.total}    accent="#3b82f6" />
         <KpiCard title="Active"         value={kpis.active}   accent="#10b981" subtitle={`${kpis.health}% health`} />
         <KpiCard title="Inactive"       value={kpis.inactive} accent="#ef4444" />
-        <KpiCard title="Active Threats" value={kpis.threats}  accent="#f59e0b" />
+        <KpiCard title="Active Threats" value={kpis.threats}  accent="#f59e0b"
+          onClick={() => navigate('/security/detail', { state: { dataset: 'agents', filterId: 'activeThreats', title: 'Endpoints with Active Threats' } })} />
         <KpiCard title="Outdated"       value={kpis.outdated} accent="#8b5cf6" />
         <KpiCard title="Health Score"   value={`${kpis.health}%`} accent="#06b6d4" subtitle="active/total" />
       </div>
@@ -401,7 +407,11 @@ export default function S1Agent() {
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
               {topRisky.map((a, i) => (
-                <tr key={i} className="hover:bg-[var(--muted-bg)]/60">
+                <tr
+                  key={i}
+                  onClick={() => navigate('/security/detail', { state: { dataset: 'agents', filterId: 'agentDetail', value: a.computerName, title: `Agent Detail: ${a.computerName}` } })}
+                  className="hover:bg-[var(--muted-bg)]/60 cursor-pointer"
+                >
                   <td className="px-3 py-2 font-medium text-[var(--foreground)]">{a.computerName}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{a.lastLoggedInUserName}</td>
                   <td className="px-3 py-2">

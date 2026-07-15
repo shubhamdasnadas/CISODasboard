@@ -17,6 +17,12 @@ const TABLE_PAGE_SIZE = 15;
 
 const fmt = (d) => d.toISOString().slice(0, 10);
 
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function mapEvent(e) {
   return {
     eventId: e.event_id,
@@ -227,6 +233,9 @@ export default function CheckpointPage() {
   const [malwareTypes, setMalwareTypes] = useState(['malware']);
   const [dlpTypes, setDlpTypes] = useState(['dlp']);
 
+  const [cardDateFrom, setCardDateFrom] = useState('');
+  const [cardDateTo, setCardDateTo]     = useState('');
+
   const [tableFilter, setTableFilter] = useState('all');
   const [tablePage, setTablePage] = useState(1);
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -271,10 +280,24 @@ export default function CheckpointPage() {
     setChartTypes(prev => prev.includes(t) ? (prev.length > 1 ? prev.filter(x => x !== t) : prev) : [...prev, t]);
   };
 
+  // Cards: date-filtered events
+  const hasCardDateFilter = !!(cardDateFrom || cardDateTo);
+  const cardEvents = useMemo(() => {
+    if (!hasCardDateFilter) return events;
+    return events.filter(e => {
+      const d = parseDate(e.eventCreated);
+      if (!d) return false;
+      const key = fmt(d);
+      if (cardDateFrom && key < cardDateFrom) return false;
+      if (cardDateTo   && key > cardDateTo)   return false;
+      return true;
+    });
+  }, [events, cardDateFrom, cardDateTo, hasCardDateFilter]);
+
   // Summaries
-  const phishingSummary = computeSummary(events, phishingTypes);
-  const malwareSummary  = computeSummary(events, malwareTypes);
-  const dlpSummary      = computeSummary(events, dlpTypes);
+  const phishingSummary = computeSummary(cardEvents, phishingTypes);
+  const malwareSummary  = computeSummary(cardEvents, malwareTypes);
+  const dlpSummary      = computeSummary(cardEvents, dlpTypes);
 
   // Chart data
   const chartData = useMemo(() => {
@@ -302,9 +325,10 @@ export default function CheckpointPage() {
   const pagedTableEvents = filteredTableEvents.slice((tablePage-1)*TABLE_PAGE_SIZE, tablePage*TABLE_PAGE_SIZE);
 
   // Detail lists
-  const phishingDetail = sortedEvents.filter(e => phishingTypes.includes(e.type));
-  const malwareDetail  = sortedEvents.filter(e => malwareTypes.includes(e.type));
-  const dlpDetail      = sortedEvents.filter(e => dlpTypes.includes(e.type));
+  const sortedCardEvents = [...cardEvents].sort((a,b) => new Date(b.eventCreated)-new Date(a.eventCreated));
+  const phishingDetail = sortedCardEvents.filter(e => phishingTypes.includes(e.type));
+  const malwareDetail  = sortedCardEvents.filter(e => malwareTypes.includes(e.type));
+  const dlpDetail      = sortedCardEvents.filter(e => dlpTypes.includes(e.type));
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center h-64">
@@ -345,6 +369,24 @@ export default function CheckpointPage() {
       )}
 
       {/* Three threat cards */}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+          <input type="date" value={cardDateFrom} max={cardDateTo || undefined}
+            onChange={(e) => setCardDateFrom(e.target.value)}
+            className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+          <input type="date" value={cardDateTo} min={cardDateFrom || undefined}
+            onChange={(e) => setCardDateTo(e.target.value)}
+            className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        {hasCardDateFilter && (
+          <button onClick={() => { setCardDateFrom(''); setCardDateTo(''); }}
+            className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <ThreatCard
           label="Phishing" summary={phishingSummary}

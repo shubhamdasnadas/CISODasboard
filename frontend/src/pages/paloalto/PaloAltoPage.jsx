@@ -97,6 +97,31 @@ const getSumByColumn = (rows, cols) => {
 
 const getRowsByReport = (allReports, name) => allReports.find(r => r.report === name)?.rows ?? [];
 
+// Firewall reports don't carry a date query param server-side — the backend
+// always returns the same full snapshot regardless of startDate/endDate.
+// So the date filter is applied client-side against each row's own
+// timestamp column instead of re-fetching from the API.
+const DATE_COLS = ['slabbed-receive_time', 'receive_time', 'time_generated', 'time', 'date', 'updatedAt'];
+
+const getRowDate = (row) => {
+  const raw = getFirstValue(row, DATE_COLS, null);
+  if (!raw || raw === '-') return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+};
+
+const filterRowsByDate = (rows, dateRange) => {
+  if (!dateRange || (!dateRange.from && !dateRange.to)) return rows;
+  return rows.filter(row => {
+    const d = getRowDate(row);
+    if (!d) return true; // keep rows with no recognizable date rather than dropping them
+    const key = d.toISOString().slice(0, 10);
+    if (dateRange.from && key < dateRange.from) return false;
+    if (dateRange.to && key > dateRange.to) return false;
+    return true;
+  });
+};
+
 const makeTopChartData = (rows, cols, limit = 8) => {
   const map = new Map();
   rows.forEach(row => {
@@ -165,12 +190,69 @@ function KpiCard({ title, value, subtitle, icon, color }) {
   );
 }
 
-function ChartCard({ title, subtitle, children }) {
+function DateFilterInput({ label, value, onChange }) {
+  return (
+    <div className="flex flex-col">
+      <label className="mb-1 text-xs font-semibold uppercase text-[var(--muted)]">{label}</label>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-lg border px-3 py-2 text-sm font-medium bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]"
+      />
+    </div>
+  );
+}
+
+function ChartCard({ title, subtitle, children, dateRange, onDateChange }) {
   return (
     <div className="rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
-      <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
-      <p className="mb-4 text-sm text-[var(--muted)]">{subtitle}</p>
+      <div className="mb-4">
+        <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
+        <p className="mb-3 text-sm text-[var(--muted)]">{subtitle}</p>
+
+        {/* Date Filter */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <DateFilterInput
+            label="From"
+            value={dateRange.from}
+            onChange={(value) => onDateChange({ ...dateRange, from: value })}
+          />
+          <DateFilterInput
+            label="To"
+            value={dateRange.to}
+            onChange={(value) => onDateChange({ ...dateRange, to: value })}
+          />
+        </div>
+      </div>
+
       {children}
+    </div>
+  );
+}
+
+function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
+  return (
+    <div className="mb-6 rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
+      <h3 className="mb-4 text-base font-extrabold text-[var(--foreground)]">Global Date Filter</h3>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <DateFilterInput
+          label="From"
+          value={globalDateRange.from}
+          onChange={(value) => onGlobalDateChange({ ...globalDateRange, from: value })}
+        />
+        <DateFilterInput
+          label="To"
+          value={globalDateRange.to}
+          onChange={(value) => onGlobalDateChange({ ...globalDateRange, to: value })}
+        />
+        <button
+          onClick={() => onGlobalDateChange({ from: '', to: '' })}
+          className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 bg-[#6366f1]"
+        >
+          Reset Filters
+        </button>
+      </div>
     </div>
   );
 }
@@ -178,12 +260,23 @@ function ChartCard({ title, subtitle, children }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PaloAltoPage() {
+  const [globalDateRange, setGlobalDateRange] = useState({ from: '', to: '' });
+  const [componentDateRanges, setComponentDateRanges] = useState({
+    riskTrend: { from: '', to: '' },
+    riskDistribution: { from: '', to: '' },
+    topAttacks: { from: '', to: '' },
+    topSources: { from: '', to: '' },
+    topDeniedDestinations: { from: '', to: '' },
+    topConnections: { from: '', to: '' },
+  });
+  
   const [allReports, setAllReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   const fetchAllReports = async () => {
-    setLoading(true); setError('');
+    setLoading(true);
+    setError('');
     try {
       const results = await Promise.allSettled(
         REPORTS_TO_FETCH.map(name =>
@@ -204,30 +297,63 @@ export default function PaloAltoPage() {
     }
   };
 
-  useEffect(() => { fetchAllReports(); }, []);
+  useEffect(() => {
+    fetchAllReports();
+  }, []);
+
+  const handleGlobalDateChange = (newRange) => {
+    setGlobalDateRange(newRange);
+  };
+
+  const handleComponentDateChange = (componentName, newRange) => {
+    setComponentDateRanges(prev => ({
+      ...prev,
+      [componentName]: newRange
+    }));
+  };
+
+  // All report rows are already fetched in full — the backend has no
+  // date-range support, so filtering happens here against each row's own
+  // timestamp instead of re-querying the API.
+  const filteredReports = useMemo(
+    () => allReports.map(r => ({ ...r, rows: filterRowsByDate(r.rows, globalDateRange) })),
+    [allReports, globalDateRange]
+  );
 
   const allRows = useMemo(
-    () => allReports.flatMap(r => r.rows),
-    [allReports]
+    () => filteredReports.flatMap(r => r.rows),
+    [filteredReports]
   );
 
   const dashboard = useMemo(() => {
-    const riskRows = getRowsByReport(allReports, 'risk-trend');
-    const attackerSourceRows = getRowsByReport(allReports, 'top-attacker-sources');
-    const attackerDestRows = getRowsByReport(allReports, 'top-attacker-destinations');
-    const deniedRows = [
-      ...getRowsByReport(allReports, 'top-denied-destinations'),
-      ...getRowsByReport(allReports, 'top-denied-sources'),
-      ...getRowsByReport(allReports, 'top-denied-applications'),
+    const riskRowsAll = getRowsByReport(filteredReports, 'risk-trend');
+    const riskTrendRows = filterRowsByDate(riskRowsAll, componentDateRanges.riskTrend);
+    const riskDistRows  = filterRowsByDate(riskRowsAll, componentDateRanges.riskDistribution);
+
+    const attackerSourceRowsAll = getRowsByReport(filteredReports, 'top-attacker-sources');
+    const attackerSourceRows = filterRowsByDate(attackerSourceRowsAll, componentDateRanges.topSources);
+
+    const attackerDestRows = getRowsByReport(filteredReports, 'top-attacker-destinations');
+
+    const deniedRowsAll = [
+      ...getRowsByReport(filteredReports, 'top-denied-destinations'),
+      ...getRowsByReport(filteredReports, 'top-denied-sources'),
+      ...getRowsByReport(filteredReports, 'top-denied-applications'),
     ];
-    const riskyUserRows = getRowsByReport(allReports, 'risky-users');
-    const topAttackRows = getRowsByReport(allReports, 'top-attacks');
-    const connectionRows = getRowsByReport(allReports, 'top-connections');
+    const deniedRows = filterRowsByDate(deniedRowsAll, componentDateRanges.topDeniedDestinations);
+
+    const riskyUserRows = getRowsByReport(filteredReports, 'risky-users');
+
+    const topAttackRowsAll = getRowsByReport(filteredReports, 'top-attacks');
+    const topAttackRows = filterRowsByDate(topAttackRowsAll, componentDateRanges.topAttacks);
+
+    const connectionRowsAll = getRowsByReport(filteredReports, 'top-connections');
+    const connectionRows = filterRowsByDate(connectionRowsAll, componentDateRanges.topConnections);
 
     const totalSessions = getSumByColumn(allRows, ['nsess','sessions','session','count']);
     const totalTraffic = getSumByColumn(allRows, ['nbytes','bytes','byte']);
 
-    const highRiskEvents = riskRows.reduce((sum, row) => {
+    const highRiskEvents = riskRowsAll.reduce((sum, row) => {
       const risk = parseNumber(getFirstValue(row, ['risk','name','severity'], 0));
       if (risk >= 4) return sum + parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions'], 1));
       return sum;
@@ -252,14 +378,14 @@ export default function PaloAltoPage() {
       highRiskEvents,
       topDestination,
       securityScore,
-      riskTrendData: makeRiskTrendData(riskRows.length ? riskRows : allRows),
-      riskDistribution: makeRiskDistribution(riskRows),
+      riskTrendData: makeRiskTrendData(riskTrendRows.length ? riskTrendRows : allRows),
+      riskDistribution: makeRiskDistribution(riskDistRows),
       topAttacks: makeTopChartData(topAttackRows.length ? topAttackRows : allRows, ['threatid','threat','name','category']),
       topSources: makeTopChartData(attackerSourceRows.length ? attackerSourceRows : allRows, ['src','source','source_ip','name']),
       topDeniedDestinations: makeTopChartData(deniedRows.length ? deniedRows : allRows, ['dst','destination','destination_ip','name']),
       topConnections: makeTopChartData(connectionRows.length ? connectionRows : allRows, ['name','src','source','dst','destination']),
     };
-  }, [allReports, allRows]);
+  }, [filteredReports, allRows, componentDateRanges]);
 
   const scoreStatus = getSecurityScoreStatus(dashboard.securityScore);
 
@@ -278,7 +404,7 @@ export default function PaloAltoPage() {
           disabled={loading}
           className="rounded-xl px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-60 bg-[#3b82f6]"
         >
-          {loading ? 'Loading…' : 'Refresh'}
+          {loading ? 'Loading…' : 'Refresh All'}
         </button>
       </div>
 
@@ -296,6 +422,12 @@ export default function PaloAltoPage() {
 
       {!loading && (
         <>
+          {/* Global Date Filter */}
+          <GlobalDateFilter 
+            globalDateRange={globalDateRange} 
+            onGlobalDateChange={handleGlobalDateChange}
+          />
+
           {/* KPI Cards */}
           <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
             <KpiCard title="Total Sessions" value={formatNumber(dashboard.totalSessions)} subtitle="nsess / session count" icon="📊" color="#3b82f6" />
@@ -308,7 +440,12 @@ export default function PaloAltoPage() {
           {/* Charts */}
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             {/* Risk Trend Over Time */}
-            <ChartCard title="Risk Trend Over Time" subtitle="Bar = traffic bytes, Line = session count">
+            <ChartCard 
+              title="Risk Trend Over Time" 
+              subtitle="Bar = traffic bytes, Line = session count"
+              dateRange={componentDateRanges.riskTrend}
+              onDateChange={(newRange) => handleComponentDateChange('riskTrend', newRange)}
+            >
               <div className="h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={dashboard.riskTrendData} margin={{ top: 10, right: 25, bottom: 55, left: 10 }}>
@@ -325,7 +462,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Risk Distribution */}
-            <ChartCard title="Risk-wise Distribution" subtitle="Risk 1 to Risk 5 security distribution">
+            <ChartCard 
+              title="Risk-wise Distribution" 
+              subtitle="Risk 1 to Risk 5 security distribution"
+              dateRange={componentDateRanges.riskDistribution}
+              onDateChange={(newRange) => handleComponentDateChange('riskDistribution', newRange)}
+            >
               <div className="h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -341,7 +483,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Attacks */}
-            <ChartCard title="Top Attacks" subtitle="Most repeated firewall threat / attack names">
+            <ChartCard 
+              title="Top Attacks" 
+              subtitle="Most repeated firewall threat / attack names"
+              dateRange={componentDateRanges.topAttacks}
+              onDateChange={(newRange) => handleComponentDateChange('topAttacks', newRange)}
+            >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dashboard.topAttacks} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -358,7 +505,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Sources */}
-            <ChartCard title="Top Sources" subtitle="Highest source IP / source count">
+            <ChartCard 
+              title="Top Sources" 
+              subtitle="Highest source IP / source count"
+              dateRange={componentDateRanges.topSources}
+              onDateChange={(newRange) => handleComponentDateChange('topSources', newRange)}
+            >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dashboard.topSources} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -373,7 +525,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Denied Destinations */}
-            <ChartCard title="Top Denied Destinations" subtitle="Denied destination systems">
+            <ChartCard 
+              title="Top Denied Destinations" 
+              subtitle="Denied destination systems"
+              dateRange={componentDateRanges.topDeniedDestinations}
+              onDateChange={(newRange) => handleComponentDateChange('topDeniedDestinations', newRange)}
+            >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dashboard.topDeniedDestinations} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -388,7 +545,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Connections */}
-            <ChartCard title="Top Connections" subtitle="Most repeated firewall connections">
+            <ChartCard 
+              title="Top Connections" 
+              subtitle="Most repeated firewall connections"
+              dateRange={componentDateRanges.topConnections}
+              onDateChange={(newRange) => handleComponentDateChange('topConnections', newRange)}
+            >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={dashboard.topConnections} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>

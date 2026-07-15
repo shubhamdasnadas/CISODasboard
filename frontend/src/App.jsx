@@ -22,6 +22,7 @@ import Agent from './pages/security/Agent.jsx';
 import S1Agent from './pages/security/S1Agent.jsx';
 import S1Cve from './pages/security/S1Cve.jsx';
 import RiskyEndpoint from './pages/security/RiskyEndpoint.jsx';
+import DetailView from './pages/security/DetailView.jsx';
 
 // Integrations
 import PaloAltoPage from './pages/paloalto/PaloAltoPage.jsx';
@@ -115,6 +116,7 @@ export default function App() {
             <Route path="/security/s1agent"       element={<S1Agent />} />
             <Route path="/security/s1cve"         element={<S1Cve />} />
             <Route path="/security/riskyendpoint" element={<RiskyEndpoint />} />
+            <Route path="/security/detail"        element={<DetailView />} />
 
             {/* Integrations */}
             <Route path="/paloalto"        element={<PaloAltoPage />} />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -7,6 +8,27 @@ import api from '../../api.js';
 
 const CHART_COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#ec4899','#6366f1'];
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8, fontSize: 12 };
+
+// Canonical ATT&CK kill-chain order — S1's tactic names are matched against
+// this case-insensitively; anything unmatched falls into a trailing 'Other'
+// column so no observed data is silently dropped.
+const MITRE_TACTICS = [
+  'Reconnaissance', 'Resource Development', 'Initial Access', 'Execution',
+  'Persistence', 'Privilege Escalation', 'Defense Evasion', 'Credential Access',
+  'Discovery', 'Lateral Movement', 'Collection', 'Command and Control',
+  'Exfiltration', 'Impact',
+];
+
+// 5-step sequential orange scale by % unresolved — light (low) to full (high).
+const HEAT_SCALE = ['var(--muted-bg)', '#fed7aa', '#fdba74', '#fb923c', '#ea580c'];
+// Cells at 0% unresolved (fully resolved) are called out in green instead.
+const RESOLVED_COLOR = '#86efac';
+
+function heatStep(pct) {
+  if (!pct) return 0;
+  const ratio = pct / 100;
+  return Math.min(HEAT_SCALE.length - 1, Math.max(1, Math.ceil(ratio * (HEAT_SCALE.length - 1))));
+}
 
 function parseDate(v) {
   if (!v) return null;
@@ -39,9 +61,12 @@ function topN(counts, n) {
     .map(([name, value]) => ({ name, value }));
 }
 
-function KpiCard({ title, value, subtitle, accent }) {
+function KpiCard({ title, value, subtitle, accent, onClick }) {
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
+    <div
+      onClick={onClick}
+      className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+    >
       <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-widest">{title}</p>
       <p className="text-3xl font-bold" style={{ color: accent }}>{value}</p>
       {subtitle && <p className="text-[11px] text-[var(--muted)]">{subtitle}</p>}
@@ -64,11 +89,60 @@ function ChartCard({ title, subtitle, controls, children, height = 260 }) {
   );
 }
 
+function MitreMatrix({ matrix, onTechniqueClick, onTacticClick }) {
+  return (
+    <div className="overflow-x-auto">
+      <div className="grid gap-2" style={{ gridAutoFlow: 'column', gridAutoColumns: '150px' }}>
+        {matrix.map((col) => (
+          <div key={col.tactic} className="flex flex-col">
+            <button
+              onClick={() => col.techniques.length > 0 && onTacticClick(col.tactic)}
+              className={`text-left px-2 py-2 rounded-t-lg border border-[var(--card-border)] bg-[var(--muted-bg)] ${col.techniques.length > 0 ? 'cursor-pointer hover:opacity-80' : ''}`}
+            >
+              <p className="text-[10px] font-bold text-[var(--foreground)] leading-tight">
+                {col.tactic}{!col.isOfficial && <span className="text-[8px] font-normal text-[var(--muted)]"> (S1)</span>}
+              </p>
+              <p className="text-[9px] text-[var(--muted)] mt-0.5">{col.techniques.length} technique{col.techniques.length === 1 ? '' : 's'}</p>
+            </button>
+            <div className="flex-1 border-x border-b border-[var(--card-border)] rounded-b-lg max-h-80 overflow-y-auto">
+              {col.techniques.length === 0 ? (
+                <div className="px-2 py-3 text-[9px] text-[var(--muted)] text-center">No observed techniques</div>
+              ) : (
+                col.techniques.map((tech) => {
+                  const bg = tech.pct === 0 ? RESOLVED_COLOR : HEAT_SCALE[heatStep(tech.pct)];
+                  return (
+                    <button
+                      key={tech.name}
+                      onClick={() => onTechniqueClick(tech.name)}
+                      title={`${tech.techId ? tech.techId + ' — ' : ''}${tech.name}: ${tech.unresolved}/${tech.count} unresolved (${tech.pct}%)`}
+                      className="w-full text-left px-2 py-1.5 border-b border-[var(--card-border)] last:border-0 hover:opacity-80 cursor-pointer"
+                      style={{ background: bg }}
+                    >
+                      {tech.techId && (
+                        <p className="text-[8px] font-mono text-black/70">{tech.techId}</p>
+                      )}
+                      <p className="text-[9px] font-medium truncate text-black">{tech.name}</p>
+                      <p className="text-[9px] text-black/70">{tech.unresolved}/{tech.count} · {tech.pct}%</p>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Threats() {
+  const navigate = useNavigate();
   const [threats, setThreats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [trendFrom, setTrendFrom] = useState('');
   const [trendTo, setTrendTo]   = useState('');
+  const [mitreFrom, setMitreFrom] = useState('');
+  const [mitreTo, setMitreTo]   = useState('');
 
   useEffect(() => {
     api.get('/sentinelone/db/threats')
@@ -124,7 +198,7 @@ export default function Threats() {
   const topEndpoints = useMemo(() => {
     const c = {};
     threats.forEach((t) => { const k = t.agentRealtimeInfo?.agentComputerName; if (k) c[k] = (c[k] || 0) + 1; });
-    return topN(c, 10).map((x) => ({ ...x, name: truncateLabel(x.name) }));
+    return topN(c, 10).map((x) => ({ ...x, fullName: x.name, name: truncateLabel(x.name) }));
   }, [threats]);
 
   const mitreData = useMemo(() => {
@@ -136,8 +210,71 @@ export default function Threats() {
         });
       });
     });
-    return topN(c, 10).map((x) => ({ ...x, name: truncateLabel(x.name) }));
+    return topN(c, 10).map((x) => ({ ...x, fullName: x.name, name: truncateLabel(x.name) }));
   }, [threats]);
+
+  const mitreMatrix = useMemo(() => {
+    // S1's own tactic labels don't always match official ATT&CK tactic names
+    // (e.g. "Stealth", "Defense Impairment" are S1-specific groupings, not
+    // among the 14 canonical tactics) — those are kept as their own columns
+    // rather than merged into a generic bucket, so real, sizeable categories
+    // in the data aren't hidden.
+    const mitreFilteredThreats = (mitreFrom || mitreTo)
+      ? threats.filter((t) => {
+          const d = parseDate(t.threatInfo?.createdAt);
+          if (!d) return false;
+          const key = d.toISOString().slice(0, 10);
+          if (mitreFrom && key < mitreFrom) return false;
+          if (mitreTo   && key > mitreTo)   return false;
+          return true;
+        })
+      : threats;
+
+    const byTactic = {};
+    mitreFilteredThreats.forEach((t) => {
+      const isUnresolved = ['unresolved', 'active'].includes(t.threatInfo?.incidentStatus);
+      (t.indicators || []).forEach((ind) => {
+        (ind.tactics || []).forEach((tac) => {
+          const tacName = (tac.name || '').trim();
+          if (!tacName) return;
+          const canonical = MITRE_TACTICS.find((m) => m.toLowerCase() === tacName.toLowerCase()) || tacName;
+          if (!byTactic[canonical]) byTactic[canonical] = {};
+          (tac.techniques || []).forEach((tech) => {
+            if (!tech.name) return;
+            const key = tech.name;
+            if (!byTactic[canonical][key]) {
+              const idMatch = /\/techniques\/(T\d+)(?:\/(\d+))?\/?$/.exec(tech.link || '');
+              const techId = idMatch ? (idMatch[2] ? `${idMatch[1]}.${idMatch[2]}` : idMatch[1]) : null;
+              byTactic[canonical][key] = { count: 0, unresolved: 0, techId };
+            }
+            byTactic[canonical][key].count += 1;
+            if (isUnresolved) byTactic[canonical][key].unresolved += 1;
+          });
+        });
+      });
+    });
+
+    const extraTactics = Object.keys(byTactic)
+      .filter((name) => !MITRE_TACTICS.includes(name))
+      .sort((a, b) => {
+        const totalA = Object.values(byTactic[a]).reduce((s, v) => s + v.count, 0);
+        const totalB = Object.values(byTactic[b]).reduce((s, v) => s + v.count, 0);
+        return totalB - totalA;
+      });
+
+    const columns = [...MITRE_TACTICS, ...extraTactics].map((tacticName) => {
+      const entry = byTactic[tacticName] || {};
+      const techniques = Object.entries(entry)
+        .sort((a, b) => b[1].count - a[1].count)
+        .map(([name, { count, unresolved, techId }]) => ({
+          name, count, unresolved, techId,
+          pct: count > 0 ? Math.round((unresolved / count) * 100) : 0,
+        }));
+      return { tactic: tacticName, techniques, isOfficial: MITRE_TACTICS.includes(tacticName) };
+    });
+
+    return { columns };
+  }, [threats, mitreFrom, mitreTo]);
 
   const classificationData = useMemo(() => {
     const c = {};
@@ -261,6 +398,27 @@ export default function Threats() {
     </>
   );
 
+  const mitreControls = (
+    <>
+      <div className="flex items-center gap-1.5">
+        <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+        <input type="date" value={mitreFrom} max={mitreTo || undefined}
+          onChange={(e) => setMitreFrom(e.target.value)}
+          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+      <div className="flex items-center gap-1.5">
+        <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+        <input type="date" value={mitreTo} min={mitreFrom || undefined}
+          onChange={(e) => setMitreTo(e.target.value)}
+          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+      {(mitreFrom || mitreTo) && (
+        <button onClick={() => { setMitreFrom(''); setMitreTo(''); }}
+          className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+      )}
+    </>
+  );
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
 
@@ -275,7 +433,8 @@ export default function Threats() {
         <KpiCard title="Total Threats" value={kpis.total}   accent="#3b82f6" />
         <KpiCard title="Mitigated"     value={kpis.mitigated} accent="#10b981"
           subtitle={`${kpis.total > 0 ? Math.round((kpis.mitigated / kpis.total) * 100) : 0}% of total`} />
-        <KpiCard title="Unresolved"    value={kpis.unresolved} accent="#ef4444" />
+        <KpiCard title="Unresolved"    value={kpis.unresolved} accent="#ef4444"
+          onClick={() => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'unresolved', title: 'Unresolved Threats' } })} />
         <KpiCard title="Fileless"      value={kpis.fileless}   accent="#f59e0b" />
         <KpiCard title="Avg MTTD"      value={formatDuration(kpis.avgMttd)} accent="#8b5cf6" subtitle="time to detect" />
         <KpiCard title="Avg MTTM"      value={formatDuration(kpis.avgMttm)} accent="#06b6d4" subtitle="time to mitigate" />
@@ -305,7 +464,8 @@ export default function Threats() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
                   <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
+                  <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" cursor="pointer"
+                    onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'topEndpoint', value: data.fullName, title: `Threats on ${data.fullName}` } })} />
                 </BarChart>
               </ResponsiveContainer>
           }
@@ -320,19 +480,30 @@ export default function Threats() {
                   <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={130} />
                   <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
                   <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Count" />
+                  <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Count" cursor="pointer"
+                    onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'mitreTechnique', value: data.fullName, title: `Threats using ${data.fullName}` } })} />
                 </BarChart>
               </ResponsiveContainer>
           }
         </ChartCard>
       </div>
 
+      {/* MITRE ATT&CK Matrix */}
+      <ChartCard title="MITRE ATT&CK Matrix" subtitle="Unresolved / total threats per technique" controls={mitreControls} height="auto">
+        <MitreMatrix
+          matrix={mitreMatrix.columns}
+          onTechniqueClick={(name) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'mitreTechnique', value: name, title: `Threats using ${name}` } })}
+          onTacticClick={(name) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'mitreTactic', value: name, title: `Threats under ${name}` } })}
+        />
+      </ChartCard>
+
       {/* Classification + Fileless + Mitigation Outcomes */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <ChartCard title="Classification" height={240}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={classificationData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2}>
+              <Pie data={classificationData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2} cursor="pointer"
+                onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'classification', value: data.name, title: `${data.name} Threats` } })}>
                 {classificationData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
               </Pie>
               <Tooltip contentStyle={tooltipStyle} />

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, LabelList,
@@ -8,6 +8,12 @@ import {
 } from 'recharts';
 
 const dateFmt = (d) => d.toISOString().slice(0, 10);
+
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 const TOOLTIP_STYLE = {
   background: 'var(--card-bg)',
@@ -367,42 +373,79 @@ function RemediationRateChart({ events }) {
 
 // ── Main export ────────────────────────────────────────────────────────────────
 export default function CheckpointDashboard({ events }) {
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const hasDateFilter = !!(dateFrom || dateTo);
+
+  const filteredEvents = useMemo(() => {
+    if (!events) return [];
+    if (!hasDateFilter) return events;
+    return events.filter((e) => {
+      const d = parseDate(e.eventCreated);
+      if (!d) return false;
+      const key = dateFmt(d);
+      if (dateFrom && key < dateFrom) return false;
+      if (dateTo   && key > dateTo)   return false;
+      return true;
+    });
+  }, [events, dateFrom, dateTo, hasDateFilter]);
+
   if (!events || events.length === 0) return null;
 
   return (
     <section className="mt-6 space-y-4">
-      <h2 className="text-base font-semibold text-[var(--foreground)]">Analytics Overview</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Analytics Overview</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {hasDateFilter && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
+        </div>
+      </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <WeekOverWeek events={events} />
-        <AvgSeverity events={events} />
-        <CriticalEvents events={events} />
+        <WeekOverWeek events={filteredEvents} />
+        <AvgSeverity events={filteredEvents} />
+        <CriticalEvents events={filteredEvents} />
       </div>
 
       {/* Donut charts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <SeverityDonut events={events} />
-        <StateDonut events={events} />
-        <ConfidenceDonut events={events} />
+        <SeverityDonut events={filteredEvents} />
+        <StateDonut events={filteredEvents} />
+        <ConfidenceDonut events={filteredEvents} />
       </div>
 
       {/* Sender analysis */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TopSenderDomains events={events} />
-        <TopSenders events={events} />
+        <TopSenderDomains events={filteredEvents} />
+        <TopSenders events={filteredEvents} />
       </div>
 
       {/* Target + cumulative */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TopTargetedMailboxes events={events} />
-        <CumulativeTimeline events={events} />
+        <TopTargetedMailboxes events={filteredEvents} />
+        <CumulativeTimeline events={filteredEvents} />
       </div>
 
       {/* Platform + remediation */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <SaasPlatformChart events={events} />
-        <RemediationRateChart events={events} />
+        <SaasPlatformChart events={filteredEvents} />
+        <RemediationRateChart events={filteredEvents} />
       </div>
     </section>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import TicketVolcanoGraph from './TicketVolcanoGraph';
@@ -14,6 +14,46 @@ const agingBuckets = ['<1h', '1-4h', '4-24h', '1-3d', '3+d'];
 const barColors = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
 const closedStatuses = new Set(['closed', 'technically closed', 'duplicate']);
 const pageSize = 10;
+
+const getPeriodLabel = (from, to) => {
+  if (!from && !to) return 'All available tickets';
+  const format = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+  if (from && to) return `${format(from)} – ${format(to)}`;
+  return from ? `From ${format(from)}` : `Until ${format(to)}`;
+};
+
+const filterTicketsByPeriod = (tickets, from, to) => tickets.filter((ticket) => {
+  if (!from && !to) return true;
+  const createdAt = ticket?.created_at || ticket?.createdTime || ticket?.createdAt;
+  const createdDate = new Date(createdAt);
+  if (!createdAt || Number.isNaN(createdDate.getTime())) return false;
+  const start = from ? new Date(`${from}T00:00:00`) : null;
+  const end = to ? new Date(`${to}T23:59:59.999`) : null;
+  return (!start || createdDate >= start) && (!end || createdDate <= end);
+});
+
+function WidgetDateFilter({ tickets = [], children }) {
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const safeTickets = Array.isArray(tickets) ? tickets : [];
+  const filteredTickets = useMemo(() => filterTicketsByPeriod(safeTickets, from, to), [safeTickets, from, to]);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap items-center justify-end gap-2 text-xs">
+        <span className="mr-auto text-[var(--muted)]">{getPeriodLabel(from, to)} · {filteredTickets.length} tickets</span>
+        <input aria-label="Widget from date" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)}
+          className="h-8 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 text-xs text-[var(--foreground)] outline-none focus:ring-2 focus:ring-indigo-500" />
+        <input aria-label="Widget to date" type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)}
+          className="h-8 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] px-2 text-xs text-[var(--foreground)] outline-none focus:ring-2 focus:ring-indigo-500" />
+        {(from || to) && <button type="button" onClick={() => { setFrom(''); setTo(''); }} className="h-8 rounded-md px-2 font-medium text-indigo-600 hover:bg-indigo-50">Clear</button>}
+      </div>
+      {typeof children === 'function' ? children(filteredTickets) : null}
+    </div>
+  );
+}
 
 const STATUS_COLORS = {
   'Open': '#3b82f6',
@@ -166,10 +206,10 @@ function HoverCount({ title, count, tickets }) {
 // ── TicketListCard ─────────────────────────────────────────────────────────────
 function TicketListCard({ tickets, loading }) {
   const [assignee, setAssignee] = useState('all');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState({});
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
 
   const assignees = useMemo(() =>
     Array.from(new Set(tickets.map(getAssigneeName))).filter(Boolean).sort((a, b) => a.localeCompare(b)), [tickets]);
@@ -310,19 +350,28 @@ export default function Zohoone() {
   const [lastSynced, setLastSynced] = useState(null);
   const [info, setInfo] = useState('');
 
-  const fetchTickets = () => {
+  const fetchTickets = useCallback(async () => {
     setLoading(true);
     setError('');
-    api.get('/zoho/tickets-db')
-      .then(r => {
-        setTickets(r.data.responseData || []);
-        setLastSynced(r.data.lastSyncedAt || null);
-      })
-      .catch(e => setError(e.response?.data?.message || e.response?.data?.error || 'Failed to load tickets'))
-      .finally(() => setLoading(false));
-  };
+    try {
+      const r = await api.get('/zoho/tickets-db');
+      setTickets(r.data.responseData || []);
+      setLastSynced(r.data.lastSyncedAt || null);
+    } catch (e) {
+      setError(
+        e.response?.data?.message ||
+        e.response?.data?.error ||
+        'Failed to load tickets'
+      );
+      setTickets([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  useEffect(() => { fetchTickets(); }, []);
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
 
   const handleSync = async () => {
     setSyncing(true);
@@ -566,12 +615,12 @@ export default function Zohoone() {
       </div>
 
       <TicketListCard tickets={tickets} loading={loading} />
-      <TicketVolcanoGraph tickets={tickets} />
+      <WidgetDateFilter tickets={tickets}>{filtered => <TicketVolcanoGraph tickets={filtered} />}</WidgetDateFilter>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <Circlemember tickets={tickets} />
-        <Mttrcard tickets={tickets} />
-        <Topperformance tickets={tickets} />
+        <WidgetDateFilter tickets={tickets}>{filtered => <Circlemember tickets={filtered} />}</WidgetDateFilter>
+        <WidgetDateFilter tickets={tickets}>{filtered => <Mttrcard tickets={filtered} />}</WidgetDateFilter>
+        <WidgetDateFilter tickets={tickets}>{filtered => <Topperformance tickets={filtered} />}</WidgetDateFilter>
       </div>
 
       {/* <div className="grid gap-5 xl:grid-cols-2">
@@ -582,14 +631,14 @@ export default function Zohoone() {
       </div> */}
       <div className="grid gap-5 xl:grid-cols-5">
         <div className="xl:col-span-2">
-          <Funneldiagram />
+          <WidgetDateFilter tickets={tickets}>{filtered => <Funneldiagram tickets={filtered} loading={loading} />}</WidgetDateFilter>
         </div>
         <div className="xl:col-span-3">
-          <Hourbasedset tickets={tickets} />
+          <WidgetDateFilter tickets={tickets}>{filtered => <Hourbasedset tickets={filtered} />}</WidgetDateFilter>
         </div>
       </div>
       <div className="grid gap-5">
-        <Zohoticketcount />
+        <WidgetDateFilter tickets={tickets}>{filtered => <Zohoticketcount tickets={filtered} loading={loading} />}</WidgetDateFilter>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
