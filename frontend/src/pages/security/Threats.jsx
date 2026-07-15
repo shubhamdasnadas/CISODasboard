@@ -204,11 +204,16 @@ export default function Threats() {
   const mitreData = useMemo(() => {
     const c = {};
     threats.forEach((t) => {
+      // A threat can list the same technique across multiple indicator
+      // entries — dedupe per threat so counts match DetailView's per-threat
+      // `.some()` filter instead of counting every occurrence.
+      const seen = new Set();
       (t.indicators || []).forEach((ind) => {
         (ind.tactics || []).forEach((tac) => {
-          (tac.techniques || []).forEach((tech) => { if (tech.name) c[tech.name] = (c[tech.name] || 0) + 1; });
+          (tac.techniques || []).forEach((tech) => { if (tech.name) seen.add(tech.name); });
         });
       });
+      seen.forEach((name) => { c[name] = (c[name] || 0) + 1; });
     });
     return topN(c, 10).map((x) => ({ ...x, fullName: x.name, name: truncateLabel(x.name) }));
   }, [threats]);
@@ -233,6 +238,11 @@ export default function Threats() {
     const byTactic = {};
     mitreFilteredThreats.forEach((t) => {
       const isUnresolved = ['unresolved', 'active'].includes(t.threatInfo?.incidentStatus);
+      // A single threat can repeat the same technique across multiple
+      // indicator entries under the same tactic — dedupe per (tactic,
+      // technique) cell so one threat contributes at most once, matching
+      // the per-threat count shown when drilling into DetailView.
+      const seenCells = new Set();
       (t.indicators || []).forEach((ind) => {
         (ind.tactics || []).forEach((tac) => {
           const tacName = (tac.name || '').trim();
@@ -242,6 +252,9 @@ export default function Threats() {
           (tac.techniques || []).forEach((tech) => {
             if (!tech.name) return;
             const key = tech.name;
+            const cellKey = `${canonical}::${key}`;
+            if (seenCells.has(cellKey)) return;
+            seenCells.add(cellKey);
             if (!byTactic[canonical][key]) {
               const idMatch = /\/techniques\/(T\d+)(?:\/(\d+))?\/?$/.exec(tech.link || '');
               const techId = idMatch ? (idMatch[2] ? `${idMatch[1]}.${idMatch[2]}` : idMatch[1]) : null;
