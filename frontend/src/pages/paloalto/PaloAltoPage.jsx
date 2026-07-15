@@ -465,11 +465,7 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Risk Distribution */}
-            <ChartCard
-              title="Risk-wise Distribution"
-              subtitle="Risk 1 to Risk 5 security distribution"
-              controls={<DateFilter from={riskDistFilter.from} to={riskDistFilter.to} onFromChange={riskDistFilter.setFrom} onToChange={riskDistFilter.setTo} onClear={riskDistFilter.clear} />}
-            >
+            <ChartCard title="Risk-wise Distribution" subtitle="Risk 1 to Risk 5 security distribution">
               <div className="h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -485,11 +481,7 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Attacks */}
-            <ChartCard
-              title="Top Attacks"
-              subtitle="Most repeated firewall threat / attack names"
-              controls={<DateFilter from={topAttacksFilter.from} to={topAttacksFilter.to} onFromChange={topAttacksFilter.setFrom} onToChange={topAttacksFilter.setTo} onClear={topAttacksFilter.clear} />}
-            >
+            <ChartCard title="Top Attacks" subtitle="Most repeated firewall threat / attack names">
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topAttacksData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -506,11 +498,7 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Sources */}
-            <ChartCard
-              title="Top Sources"
-              subtitle="Highest source IP / source count"
-              controls={<DateFilter from={topSourcesFilter.from} to={topSourcesFilter.to} onFromChange={topSourcesFilter.setFrom} onToChange={topSourcesFilter.setTo} onClear={topSourcesFilter.clear} />}
-            >
+            <ChartCard title="Top Sources" subtitle="Highest source IP / source count">
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topSourcesData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -525,11 +513,7 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Denied Destinations */}
-            <ChartCard
-              title="Top Denied Destinations"
-              subtitle="Denied destination systems"
-              controls={<DateFilter from={deniedFilter.from} to={deniedFilter.to} onFromChange={deniedFilter.setFrom} onToChange={deniedFilter.setTo} onClear={deniedFilter.clear} />}
-            >
+            <ChartCard title="Top Denied Destinations" subtitle="Denied destination systems">
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={deniedDestData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
@@ -544,11 +528,7 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Connections */}
-            <ChartCard
-              title="Top Connections"
-              subtitle="Most repeated firewall connections"
-              controls={<DateFilter from={connectionsFilter.from} to={connectionsFilter.to} onFromChange={connectionsFilter.setFrom} onToChange={connectionsFilter.setTo} onClear={connectionsFilter.clear} />}
-            >
+            <ChartCard title="Top Connections" subtitle="Most repeated firewall connections">
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={connectionsData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
