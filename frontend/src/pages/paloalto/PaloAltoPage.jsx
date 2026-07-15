@@ -196,38 +196,48 @@ function KpiCard({ title, value, subtitle, icon, color }) {
   );
 }
 
-function DateFilter({ from, to, onFromChange, onToChange, onClear }) {
+function DateFilterInput({ label, value, onChange, min, max }) {
   return (
-    <div className="flex items-center gap-1.5 flex-wrap">
-      <input type="date" value={from} max={to || undefined}
-        onChange={(e) => onFromChange(e.target.value)}
-        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-      <span className="text-[10px] text-[var(--muted)]">→</span>
-      <input type="date" value={to} min={from || undefined}
-        onChange={(e) => onToChange(e.target.value)}
-        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
-      {(from || to) && (
-        <button onClick={onClear} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">✕</button>
-      )}
+    <div className="flex items-center gap-1.5">
+      <label className="text-[10px] text-[var(--muted)] font-medium">{label}</label>
+      <input
+        type="date"
+        value={value}
+        min={min}
+        max={max}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      />
     </div>
   );
 }
 
-function useCardFilter(rows) {
-  const [from, setFrom] = useState('');
-  const [to, setTo]     = useState('');
-  const filtered = useMemo(() => filterRowsByDate(rows, from, to), [rows, from, to]);
-  const clear = () => { setFrom(''); setTo(''); };
-  return { from, to, setFrom, setTo, clear, filtered };
-}
-
-function ChartCard({ title, subtitle, controls, children }) {
+function ChartCard({ title, subtitle, children, dateRange, onDateChange }) {
+  const hasFilter = !!(dateRange.from || dateRange.to);
   return (
     <div className="rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
-      <div className="mb-4 flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
-          {subtitle && <p className="text-sm text-[var(--muted)] mt-0.5">{subtitle}</p>}
+      <div className="mb-4">
+        <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
+        <p className="mb-3 text-sm text-[var(--muted)]">{subtitle}</p>
+
+        {/* Date Filter */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <DateFilterInput
+            label="From"
+            value={dateRange.from}
+            max={dateRange.to || undefined}
+            onChange={(value) => onDateChange({ ...dateRange, from: value })}
+          />
+          <DateFilterInput
+            label="To"
+            value={dateRange.to}
+            min={dateRange.from || undefined}
+            onChange={(value) => onDateChange({ ...dateRange, to: value })}
+          />
+          {hasFilter && (
+            <button onClick={() => onDateChange({ from: '', to: '' })}
+              className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
         </div>
         {controls && <div className="flex items-center gap-2">{controls}</div>}
       </div>
@@ -236,28 +246,26 @@ function ChartCard({ title, subtitle, controls, children }) {
   );
 }
 
-function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
+function KpiDateFilter({ kpiDateRange, onKpiDateChange }) {
+  const hasFilter = !!(kpiDateRange.from || kpiDateRange.to);
   return (
-    <div className="mb-6 rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
-      <h3 className="mb-4 text-base font-extrabold text-[var(--foreground)]">Global Date Filter</h3>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <DateFilterInput
-          label="From"
-          value={globalDateRange.from}
-          onChange={(value) => onGlobalDateChange({ ...globalDateRange, from: value })}
-        />
-        <DateFilterInput
-          label="To"
-          value={globalDateRange.to}
-          onChange={(value) => onGlobalDateChange({ ...globalDateRange, to: value })}
-        />
-        <button
-          onClick={() => onGlobalDateChange({ from: '', to: '' })}
-          className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 bg-[#6366f1]"
-        >
-          Reset Filters
-        </button>
-      </div>
+    <div className="mb-4 flex items-center justify-end gap-2 flex-wrap">
+      <DateFilterInput
+        label="From"
+        value={kpiDateRange.from}
+        max={kpiDateRange.to || undefined}
+        onChange={(value) => onKpiDateChange({ ...kpiDateRange, from: value })}
+      />
+      <DateFilterInput
+        label="To"
+        value={kpiDateRange.to}
+        min={kpiDateRange.from || undefined}
+        onChange={(value) => onKpiDateChange({ ...kpiDateRange, to: value })}
+      />
+      {hasFilter && (
+        <button onClick={() => onKpiDateChange({ from: '', to: '' })}
+          className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+      )}
     </div>
   );
 }
@@ -265,7 +273,7 @@ function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PaloAltoPage() {
-  const [globalDateRange, setGlobalDateRange] = useState({ from: '', to: '' });
+  const [kpiDateRange, setKpiDateRange] = useState({ from: '', to: '' });
   const [componentDateRanges, setComponentDateRanges] = useState({
     riskTrend: { from: '', to: '' },
     riskDistribution: { from: '', to: '' },
@@ -300,79 +308,100 @@ export default function PaloAltoPage() {
     }
   };
 
-  useEffect(() => { fetchAllReports(); }, []);
+  useEffect(() => {
+    fetchAllReports();
+  }, []);
 
-  // Raw rows per report (no global filter)
-  const riskRows        = useMemo(() => getRowsByReport(allReports, 'risk-trend'), [allReports]);
-  const attackSrcRows   = useMemo(() => getRowsByReport(allReports, 'top-attacker-sources'), [allReports]);
-  const attackDestRows  = useMemo(() => getRowsByReport(allReports, 'top-attacker-destinations'), [allReports]);
-  const deniedRows      = useMemo(() => [
-    ...getRowsByReport(allReports, 'top-denied-destinations'),
-    ...getRowsByReport(allReports, 'top-denied-sources'),
-    ...getRowsByReport(allReports, 'top-denied-applications'),
-  ], [allReports]);
-  const riskyUserRows   = useMemo(() => getRowsByReport(allReports, 'risky-users'), [allReports]);
-  const topAttackRows   = useMemo(() => getRowsByReport(allReports, 'top-attacks'), [allReports]);
-  const connectionRows  = useMemo(() => getRowsByReport(allReports, 'top-connections'), [allReports]);
-  const allRows         = useMemo(() => allReports.flatMap(r => r.rows), [allReports]);
+  const handleKpiDateChange = (newRange) => {
+    setKpiDateRange(newRange);
+  };
 
-  // Single shared date filter for all KPI cards
-  const [kpiFrom, setKpiFrom] = useState('');
-  const [kpiTo,   setKpiTo]   = useState('');
+  const handleComponentDateChange = (componentName, newRange) => {
+    setComponentDateRanges(prev => ({
+      ...prev,
+      [componentName]: newRange
+    }));
+  };
 
-  const kpiRows = useMemo(() => filterRowsByDate(allRows, kpiFrom, kpiTo), [allRows, kpiFrom, kpiTo]);
-  const kpiRiskRows   = useMemo(() => filterRowsByDate(riskRows,    kpiFrom, kpiTo), [riskRows,    kpiFrom, kpiTo]);
-  const kpiDeniedRows = useMemo(() => filterRowsByDate(deniedRows,  kpiFrom, kpiTo), [deniedRows,  kpiFrom, kpiTo]);
-  const kpiDestRows   = useMemo(() => filterRowsByDate(attackDestRows, kpiFrom, kpiTo), [attackDestRows, kpiFrom, kpiTo]);
-  const kpiRiskyRows  = useMemo(() => filterRowsByDate(riskyUserRows,  kpiFrom, kpiTo), [riskyUserRows,  kpiFrom, kpiTo]);
+  // Charts each carry their own independent date filter (componentDateRanges)
+  // and are otherwise sourced from the full, unfiltered report set — there is
+  // no page-wide date filter. Only the KPI card row below has a shared range.
+  const allRows = useMemo(
+    () => allReports.flatMap(r => r.rows),
+    [allReports]
+  );
 
-  // Per-card filters
-  const riskTrendFilter   = useCardFilter(riskRows);
-  const riskDistFilter    = useCardFilter(riskRows);
-  const topAttacksFilter  = useCardFilter(topAttackRows);
-  const topSourcesFilter  = useCardFilter(attackSrcRows);
-  const deniedFilter      = useCardFilter(deniedRows);
-  const connectionsFilter = useCardFilter(connectionRows);
+  const kpiRows = useMemo(
+    () => filterRowsByDate(allRows, kpiDateRange),
+    [allRows, kpiDateRange]
+  );
 
-  // KPI values — filtered by shared KPI date filter
-  const kpis = useMemo(() => {
-    const totalSessions  = getSumByColumn(kpiRows, ['nsess','sessions','session','count']);
-    const totalTraffic   = getSumByColumn(kpiRows, ['nbytes','bytes','byte']);
+  const dashboard = useMemo(() => {
+    const riskRowsAll = getRowsByReport(allReports, 'risk-trend');
+    const riskTrendRows = filterRowsByDate(riskRowsAll, componentDateRanges.riskTrend);
+    const riskDistRows  = filterRowsByDate(riskRowsAll, componentDateRanges.riskDistribution);
+
+    const attackerSourceRowsAll = getRowsByReport(allReports, 'top-attacker-sources');
+    const attackerSourceRows = filterRowsByDate(attackerSourceRowsAll, componentDateRanges.topSources);
+
+    const attackerDestRowsAll = getRowsByReport(allReports, 'top-attacker-destinations');
+
+    const deniedRowsAll = [
+      ...getRowsByReport(allReports, 'top-denied-destinations'),
+      ...getRowsByReport(allReports, 'top-denied-sources'),
+      ...getRowsByReport(allReports, 'top-denied-applications'),
+    ];
+    const deniedRows = filterRowsByDate(deniedRowsAll, componentDateRanges.topDeniedDestinations);
+
+    const riskyUserRowsAll = getRowsByReport(allReports, 'risky-users');
+
+    const topAttackRowsAll = getRowsByReport(allReports, 'top-attacks');
+    const topAttackRows = filterRowsByDate(topAttackRowsAll, componentDateRanges.topAttacks);
+
+    const connectionRowsAll = getRowsByReport(allReports, 'top-connections');
+    const connectionRows = filterRowsByDate(connectionRowsAll, componentDateRanges.topConnections);
+
+    // KPI cards: all filtered by the single shared kpiDateRange, independent
+    // of each chart's own per-chart filter above.
+    const kpiRiskRows = filterRowsByDate(riskRowsAll, kpiDateRange);
+    const kpiAttackerDestRows = filterRowsByDate(attackerDestRowsAll, kpiDateRange);
+    const kpiDeniedRows = filterRowsByDate(deniedRowsAll, kpiDateRange);
+    const kpiRiskyUserRows = filterRowsByDate(riskyUserRowsAll, kpiDateRange);
+
+    const totalSessions = getSumByColumn(kpiRows, ['nsess','sessions','session','count']);
+    const totalTraffic = getSumByColumn(kpiRows, ['nbytes','bytes','byte']);
+
     const highRiskEvents = kpiRiskRows.reduce((sum, row) => {
       const risk = parseNumber(getFirstValue(row, ['risk','name','severity'], 0));
       return risk >= 4 ? sum + parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions'], 1)) : sum;
     }, 0);
+
     const blockedConnections = kpiDeniedRows.length || kpiRows.filter(row => {
       const action = String(getFirstValue(row, ['action','category','name'], '')).toLowerCase();
       return action.includes('block') || action.includes('deny') || action.includes('drop');
     }).length;
     const topDestination = makeTopChartData(
-      kpiDestRows.length ? kpiDestRows : kpiRows,
+      attackerDestRowsAll.length ? kpiAttackerDestRows : kpiRows,
       ['dst','destination','destination_ip','name']
     )[0]?.name || '-';
-    const securityScore = Math.max(0, Math.min(100,
-      Math.round(100 - highRiskEvents * 0.05 - kpiRiskyRows.length * 2 - blockedConnections * 0.1)
-    ));
-    return { totalSessions, totalTraffic, highRiskEvents, topDestination, securityScore };
-  }, [kpiRows, kpiRiskRows, kpiDeniedRows, kpiDestRows, kpiRiskyRows]);
 
-  // Per-card chart data
-  const riskTrendData   = useMemo(() => makeRiskTrendData(riskTrendFilter.filtered), [riskTrendFilter.filtered]);
-  const riskDistData    = useMemo(() => makeRiskDistribution(riskDistFilter.filtered), [riskDistFilter.filtered]);
-  const isActive = (f) => !!(f.from || f.to);
-  const topAttacksData  = useMemo(() => makeTopChartData(isActive(topAttacksFilter) ? topAttacksFilter.filtered : topAttackRows, ['threatid','threat','name','category']), [topAttacksFilter.filtered, topAttacksFilter.from, topAttacksFilter.to, topAttackRows]);
-  const topSourcesData  = useMemo(() => makeTopChartData(isActive(topSourcesFilter) ? topSourcesFilter.filtered : attackSrcRows, ['src','source','source_ip','name']), [topSourcesFilter.filtered, topSourcesFilter.from, topSourcesFilter.to, attackSrcRows]);
-  const deniedDestData  = useMemo(() => {
-    const rows = isActive(deniedFilter) ? deniedFilter.filtered : deniedRows;
-    // Try all possible column names used across top-denied-destinations / sources / applications
-    const data = makeTopChartData(rows, ['dst','destination','destination_ip','app','application','name','category']);
-    // If still empty, render raw name column as-is
-    if (data.length === 0) {
-      return makeTopChartData(rows, Object.keys(rows[0] || {}));
-    }
-    return data;
-  }, [deniedFilter.filtered, deniedRows]);
-  const connectionsData = useMemo(() => makeTopChartData(isActive(connectionsFilter) ? connectionsFilter.filtered : connectionRows, ['name','src','source','dst','destination']), [connectionsFilter.filtered, connectionsFilter.from, connectionsFilter.to, connectionRows]);
+    const criticalUsers = kpiRiskyUserRows.length;
+    const securityScore = Math.max(0, Math.min(100, Math.round(100 - highRiskEvents * 0.05 - criticalUsers * 2 - blockedConnections * 0.1)));
+
+    return {
+      totalSessions,
+      totalTraffic,
+      highRiskEvents,
+      topDestination,
+      securityScore,
+      riskTrendData: makeRiskTrendData(riskRowsAll.length ? riskTrendRows : allRows),
+      riskDistribution: makeRiskDistribution(riskDistRows),
+      topAttacks: makeTopChartData(topAttackRowsAll.length ? topAttackRows : allRows, ['threatid','threat','name','category']),
+      topSources: makeTopChartData(attackerSourceRowsAll.length ? attackerSourceRows : allRows, ['src','source','source_ip','name']),
+      topDeniedDestinations: makeTopChartData(deniedRowsAll.length ? deniedRows : allRows, ['dst','destination','destination_ip','name']),
+      topConnections: makeTopChartData(connectionRowsAll.length ? connectionRows : allRows, ['name','src','source','dst','destination']),
+    };
+  }, [allReports, allRows, kpiRows, kpiDateRange, componentDateRanges]);
 
   const scoreStatus = getSecurityScoreStatus(kpis.securityScore);
 
@@ -412,23 +441,11 @@ export default function PaloAltoPage() {
 
       {!loading && (
         <>
-          {/* KPI Date Filter */}
-          <div className="mb-4 flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide">KPI Filter:</span>
-            <input type="date" value={kpiFrom} max={kpiTo || undefined}
-              onChange={(e) => setKpiFrom(e.target.value)}
-              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-            <span className="text-[11px] text-[var(--muted)]">→</span>
-            <input type="date" value={kpiTo} min={kpiFrom || undefined}
-              onChange={(e) => setKpiTo(e.target.value)}
-              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-            {(kpiFrom || kpiTo) && (
-              <button onClick={() => { setKpiFrom(''); setKpiTo(''); }}
-                className="text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
-            )}
-          </div>
-
           {/* KPI Cards */}
+          <KpiDateFilter
+            kpiDateRange={kpiDateRange}
+            onKpiDateChange={handleKpiDateChange}
+          />
           <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
             <KpiCard title="Total Sessions"  value={formatNumber(kpis.totalSessions)}      subtitle="nsess / session count"   icon="📊" color="#3b82f6" />
             <KpiCard title="Total Traffic"   value={formatBytes(kpis.totalTraffic)}         subtitle="nbytes total traffic"    icon="🌐" color="#06b6d4" />
@@ -447,95 +464,119 @@ export default function PaloAltoPage() {
               controls={<DateFilter from={riskTrendFilter.from} to={riskTrendFilter.to} onFromChange={riskTrendFilter.setFrom} onToChange={riskTrendFilter.setTo} onClear={riskTrendFilter.clear} />}
             >
               <div className="h-[360px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={riskTrendData} margin={{ top: 10, right: 25, bottom: 55, left: 10 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                    <XAxis dataKey="date" angle={-35} textAnchor="end" height={75} tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left"  tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={formatBytes} />
-                    <Tooltip formatter={(v, name) => name === 'traffic' ? [formatBytes(v), 'Traffic'] : [formatNumber(parseNumber(v)), 'Sessions']} />
-                    <Bar  yAxisId="right" dataKey="traffic"  fill="#3b82f6" radius={[5,5,0,0]} maxBarSize={42} />
-                    <Line yAxisId="left"  type="monotone" dataKey="sessions" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                {dashboard.riskTrendData.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={dashboard.riskTrendData} margin={{ top: 10, right: 25, bottom: 55, left: 10 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                      <XAxis dataKey="date" angle={-35} textAnchor="end" height={75} tick={{ fontSize: 11 }} />
+                      <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={formatBytes} />
+                      <Tooltip formatter={(v, name) => name === 'traffic' ? [formatBytes(v), 'Traffic'] : [formatNumber(parseNumber(v)), 'Sessions']} />
+                      <Bar yAxisId="right" dataKey="traffic" fill="#3b82f6" radius={[5, 5, 0, 0]} maxBarSize={42} />
+                      <Line yAxisId="left" type="monotone" dataKey="sessions" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
             {/* Risk Distribution */}
             <ChartCard title="Risk-wise Distribution" subtitle="Risk 1 to Risk 5 security distribution">
               <div className="h-[360px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={riskDistData} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }}>
-                      {riskDistData.map((entry, i) => (
-                        <Cell key={i} fill={RISK_COLORS[String(entry.risk)] || COLORS[i % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={v => formatNumber(parseNumber(v))} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {dashboard.riskDistribution.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={dashboard.riskDistribution} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }}>
+                        {dashboard.riskDistribution.map((entry, i) => (
+                          <Cell key={i} fill={RISK_COLORS[String(entry.risk)] || COLORS[i % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={v => formatNumber(parseNumber(v))} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
             {/* Top Attacks */}
             <ChartCard title="Top Attacks" subtitle="Most repeated firewall threat / attack names">
               <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topAttacksData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" radius={[0,5,5,0]}>
-                      {topAttacksData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboard.topAttacks.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboard.topAttacks} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" radius={[0, 5, 5, 0]}>
+                        {dashboard.topAttacks.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
             {/* Top Sources */}
             <ChartCard title="Top Sources" subtitle="Highest source IP / source count">
               <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topSourcesData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#3b82f6" radius={[0,5,5,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboard.topSources.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboard.topSources} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 5, 5, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
             {/* Top Denied Destinations */}
             <ChartCard title="Top Denied Destinations" subtitle="Denied destination systems">
               <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={deniedDestData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#ef4444" radius={[0,5,5,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboard.topDeniedDestinations.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboard.topDeniedDestinations} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#ef4444" radius={[0, 5, 5, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
             {/* Top Connections */}
             <ChartCard title="Top Connections" subtitle="Most repeated firewall connections">
               <div className="h-[320px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={connectionsData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                    <XAxis type="number" tick={{ fontSize: 11 }} />
-                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
-                    <Tooltip />
-                    <Bar dataKey="value" fill="#10b981" radius={[0,5,5,0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {dashboard.topConnections.length === 0 ? (
+                  <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboard.topConnections} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                      <XAxis type="number" tick={{ fontSize: 11 }} />
+                      <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="value" fill="#10b981" radius={[0, 5, 5, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </ChartCard>
 
