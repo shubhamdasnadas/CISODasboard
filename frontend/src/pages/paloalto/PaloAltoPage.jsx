@@ -482,7 +482,7 @@ export default function PaloAltoPage() {
               </div>
             </ChartCard>
 
-            {/* Top Attacks */}
+            {/* Top Attacks      */}
             <ChartCard 
               title="Top Attacks" 
               subtitle="Most repeated firewall threat / attack names"
