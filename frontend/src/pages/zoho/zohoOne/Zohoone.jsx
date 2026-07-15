@@ -9,11 +9,11 @@ import Hourbasedset from './Hourbasedset';
 import Zohoticketcount from './Zohoticketcount';
 import Topperformance from './Topperformance';
 
-const weekdays   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const agingBuckets = ['<1h', '1-4h', '4-24h', '1-3d', '3+d'];
-const barColors  = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
+const barColors = ['#2563eb', '#16a34a', '#f59e0b', '#dc2626', '#7c3aed', '#0891b2', '#db2777'];
 const closedStatuses = new Set(['closed', 'technically closed', 'duplicate']);
-const pageSize   = 10;
+const pageSize = 10;
 
 const STATUS_COLORS = {
   'Open': '#3b82f6',
@@ -44,16 +44,16 @@ function timeAgo(iso) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const normalizeText   = (v) => String(v || '').trim();
-const getTicketNo     = (t) => normalizeText(t.ticket_no) || normalizeText(t.ticketNumber) || '-';
-const getCreatedAt    = (t) => normalizeText(t.created_at) || normalizeText(t.createdTime);
-const getClosedAt     = (t) => normalizeText(t.closed_at) || normalizeText(t.closedTime) || normalizeText(t.closedAt) || normalizeText(t.closeTime) || normalizeText(t.closedDate);
+const normalizeText = (v) => String(v || '').trim();
+const getTicketNo = (t) => normalizeText(t.ticket_no) || normalizeText(t.ticketNumber) || '-';
+const getCreatedAt = (t) => normalizeText(t.created_at) || normalizeText(t.createdTime);
+const getClosedAt = (t) => normalizeText(t.closed_at) || normalizeText(t.closedTime) || normalizeText(t.closedAt) || normalizeText(t.closeTime) || normalizeText(t.closedDate);
 const getCustomerResponseTime = (t) => normalizeText(t.customerResponseTime) || normalizeText(t.customer_response_time) || normalizeText(t.customer_responseTime) || normalizeText(t.responseTime) || '-';
 const getAssigneeName = (t) => `${normalizeText(t.assignee?.firstName)} ${normalizeText(t.assignee?.lastName)}`.trim() || 'Unassigned';
-const getDeptName     = (t) => normalizeText(t.department?.name) || normalizeText(t.departmentName) || 'Unknown Department';
-const getContactName  = (t) => `${normalizeText(t.contact?.firstName)} ${normalizeText(t.contact?.lastName)}`.trim() || normalizeText(t.contact?.email) || 'Unknown';
-const isClosedTicket  = (t) => closedStatuses.has(normalizeText(t.status).toLowerCase());
-const getTicketKey    = (t, i) => normalizeText(t.id) || normalizeText(t.ticketNumber) || normalizeText(t.ticket_no) || String(i);
+const getDeptName = (t) => normalizeText(t.department?.name) || normalizeText(t.departmentName) || 'Unknown Department';
+const getContactName = (t) => `${normalizeText(t.contact?.firstName)} ${normalizeText(t.contact?.lastName)}`.trim() || normalizeText(t.contact?.email) || 'Unknown';
+const isClosedTicket = (t) => closedStatuses.has(normalizeText(t.status).toLowerCase());
+const getTicketKey = (t, i) => normalizeText(t.id) || normalizeText(t.ticketNumber) || normalizeText(t.ticket_no) || String(i);
 
 const formatDateTime = (date) => {
   if (!date) return '-';
@@ -167,8 +167,8 @@ function HoverCount({ title, count, tickets }) {
 function TicketListCard({ tickets, loading }) {
   const [assignee, setAssignee] = useState('all');
   const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate]     = useState('');
-  const [page, setPage]         = useState(1);
+  const [toDate, setToDate] = useState('');
+  const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState({});
 
   const assignees = useMemo(() =>
@@ -176,7 +176,7 @@ function TicketListCard({ tickets, loading }) {
 
   const filtered = useMemo(() => {
     const from = fromDate ? new Date(`${fromDate}T00:00:00`) : null;
-    const to   = toDate   ? new Date(`${toDate}T23:59:59`)   : null;
+    const to = toDate ? new Date(`${toDate}T23:59:59`) : null;
     return tickets.filter(t => {
       if (assignee !== 'all' && getAssigneeName(t) !== assignee) return false;
       const ca = getCreatedAt(t); const cd = new Date(ca);
@@ -187,14 +187,14 @@ function TicketListCard({ tickets, loading }) {
     });
   }, [assignee, fromDate, toDate, tickets]);
 
-  const pageCount   = Math.max(Math.ceil(filtered.length / pageSize), 1);
-  const safePage    = Math.min(page, pageCount);
-  const startIndex  = filtered.length ? (safePage - 1) * pageSize : 0;
-  const endIndex    = Math.min(startIndex + pageSize, filtered.length);
-  const visible     = filtered.slice(startIndex, endIndex);
-  const pages       = Array.from({ length: pageCount }, (_, i) => i + 1).filter(p => p === 1 || p === pageCount || Math.abs(p - safePage) <= 1);
-  const goTo        = (p) => setPage(Math.min(Math.max(p, 1), pageCount));
-  const reset       = () => { setPage(1); setExpanded({}); };
+  const pageCount = Math.max(Math.ceil(filtered.length / pageSize), 1);
+  const safePage = Math.min(page, pageCount);
+  const startIndex = filtered.length ? (safePage - 1) * pageSize : 0;
+  const endIndex = Math.min(startIndex + pageSize, filtered.length);
+  const visible = filtered.slice(startIndex, endIndex);
+  const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter(p => p === 1 || p === pageCount || Math.abs(p - safePage) <= 1);
+  const goTo = (p) => setPage(Math.min(Math.max(p, 1), pageCount));
+  const reset = () => { setPage(1); setExpanded({}); };
 
   return (
     <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
@@ -396,13 +396,13 @@ export default function Zohoone() {
     return Object.values(grouped).sort((a, b) => (b.closed.length - a.closed.length) || a.engineer.localeCompare(b.engineer));
   }, [tickets]);
 
-  const activeTrend   = ticketTrend.find(r => r.day === activeDay);
+  const activeTrend = ticketTrend.find(r => r.day === activeDay);
   const maxTicketCount = Math.max(...ticketTrend.map(r => r.tickets.length), 1);
 
   const departmentAgingMatrix = useMemo(() => {
     const grouped = {};
     tickets.forEach(t => {
-      const dept   = getDeptName(t);
+      const dept = getDeptName(t);
       const bucket = getResolutionTimeBucket(t);
       if (!bucket) return;
       if (!grouped[dept]) { grouped[dept] = {}; agingBuckets.forEach(b => { grouped[dept][b] = []; }); }
@@ -421,16 +421,16 @@ export default function Zohoone() {
     tickets.forEach(t => {
       const ca = getCreatedAt(t); const d = new Date(ca);
       if (!ca || isNaN(d.getTime())) return;
-      const key   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
       const label = d.toLocaleString('en-US', { month: 'short' });
-      const dept  = getDeptName(t);
+      const dept = getDeptName(t);
       monthMap.set(key, label);
       if (!deptMap[dept]) deptMap[dept] = {};
       if (!deptMap[dept][key]) deptMap[dept][key] = [];
       deptMap[dept][key].push(t);
     });
     const months = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-5).map(([key, label]) => ({ key, label }));
-    const rows   = Object.entries(deptMap).map(([dept, mt]) => ({ department: dept, monthTickets: mt }))
+    const rows = Object.entries(deptMap).map(([dept, mt]) => ({ department: dept, monthTickets: mt }))
       .sort((a, b) => {
         const aT = months.reduce((s, m) => s + (a.monthTickets[m.key]?.length || 0), 0);
         const bT = months.reduce((s, m) => s + (b.monthTickets[m.key]?.length || 0), 0);
@@ -489,10 +489,10 @@ export default function Zohoone() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total',         value: tickets.length,                                              color: '#6366f1' },
-          { label: 'Open',          value: tickets.filter(t => t.status === 'Open').length,             color: '#3b82f6' },
+          { label: 'Total', value: tickets.length, color: '#6366f1' },
+          { label: 'Open', value: tickets.filter(t => t.status === 'Open').length, color: '#3b82f6' },
           { label: 'High Priority', value: tickets.filter(t => t.priority === 'High' || t.priority === 'Critical').length, color: '#ef4444' },
-          { label: 'Closed',        value: tickets.filter(t => ['Closed', 'Technically Closed', 'Resolved'].includes(t.status)).length, color: '#22c55e' },
+          { label: 'Closed', value: tickets.filter(t => ['Closed', 'Technically Closed', 'Resolved'].includes(t.status)).length, color: '#22c55e' },
         ].map(s => (
           <div key={s.label} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-5">
             <p className="text-sm text-[var(--muted)] mb-1.5">{s.label}</p>
@@ -553,63 +553,7 @@ export default function Zohoone() {
           className="w-full max-w-sm px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-[var(--foreground)] mb-4"
         />
 
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          {loading ? (
-            <div className="p-12 text-center">
-              <div className="animate-spin w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto" />
-            </div>
-          ) : overviewFiltered.length === 0 ? (
-            <div className="p-12 text-center text-[var(--muted)]">
-              {tickets.length === 0
-                ? 'No tickets found. Click "Sync from Zoho" to fetch tickets.'
-                : 'No tickets match your search.'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-[var(--muted-bg)] text-left">
-                    {['#', 'Subject', 'Status', 'Priority', 'Department', 'Contact', 'Assignee', 'Created'].map(h => (
-                      <th key={h} className="px-4 py-3 text-xs font-semibold text-[var(--muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--card-border)]">
-                  {overviewFiltered.slice(0, 100).map((t, i) => (
-                    <tr key={t.id || i} className="hover:bg-[var(--muted-bg)] transition-colors">
-                      <td className="px-4 py-3 text-xs text-[var(--muted)]">{t.ticketNumber || '—'}</td>
-                      <td className="px-4 py-3 font-medium text-[var(--foreground)] max-w-xs truncate">{t.subject || '—'}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
-                          backgroundColor: `${STATUS_COLORS[t.status] || '#6b7280'}22`,
-                          color: STATUS_COLORS[t.status] || '#6b7280',
-                        }}>{t.status || '—'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        {t.priority && t.priority !== '—'
-                          ? <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
-                              backgroundColor: `${PRIORITY_COLORS[t.priority] || '#6b7280'}22`,
-                              color: PRIORITY_COLORS[t.priority] || '#6b7280',
-                            }}>{t.priority}</span>
-                          : <span className="text-[var(--muted)]">—</span>
-                        }
-                      </td>
-                      <td className="px-4 py-3 text-[var(--muted)] text-xs max-w-[120px] truncate">{getDeptName(t)}</td>
-                      <td className="px-4 py-3 text-[var(--muted)] max-w-[120px] truncate">{getContactName(t)}</td>
-                      <td className="px-4 py-3 text-[var(--muted)] max-w-[120px] truncate">{getAssigneeName(t)}</td>
-                      <td className="px-4 py-3 text-[var(--muted)] text-xs whitespace-nowrap">{getCreatedAt(t) ? timeAgo(getCreatedAt(t)) : '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {overviewFiltered.length > 100 && (
-                <p className="px-4 py-3 text-xs text-center text-[var(--muted)] border-t border-[var(--card-border)]">
-                  Showing 100 of {overviewFiltered.length} tickets
-                </p>
-              )}
-            </div>
-          )}
-        </div>
+
       </div>
 
       {/* ── Analytics ─────────────────────────────────────────────────────────── */}
@@ -630,11 +574,19 @@ export default function Zohoone() {
         <Topperformance tickets={tickets} />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      {/* <div className="grid gap-5 xl:grid-cols-2">
         <Funneldiagram />
       </div>
       <div className="grid gap-5">
         <Hourbasedset tickets={tickets} />
+      </div> */}
+      <div className="grid gap-5 xl:grid-cols-5">
+        <div className="xl:col-span-2">
+          <Funneldiagram />
+        </div>
+        <div className="xl:col-span-3">
+          <Hourbasedset tickets={tickets} />
+        </div>
       </div>
       <div className="grid gap-5">
         <Zohoticketcount />
@@ -651,7 +603,7 @@ export default function Zohoone() {
                 <div className="max-h-72 overflow-auto">
                   <table className="w-full min-w-[900px] border-collapse text-xs">
                     <thead><tr className="bg-[var(--muted-bg)]">
-                      {['ticket_no','subject','createdTime','closedTime','resolve_time','assignee','status'].map(h => (
+                      {['ticket_no', 'subject', 'createdTime', 'closedTime', 'resolve_time', 'assignee', 'status'].map(h => (
                         <th key={h} className="border border-[var(--card-border)] px-2 py-2 text-left">{h}</th>
                       ))}
                     </tr></thead>
@@ -672,9 +624,9 @@ export default function Zohoone() {
             )}
             <div className="h-full w-full flex h-32 items-end gap-3 overflow-x-auto pb-2 sm:gap-5">
               {ticketTrend.map((row, idx) => {
-                const count  = row.tickets.length;
+                const count = row.tickets.length;
                 const height = Math.max((count / maxTicketCount) * 100, count ? 10 : 3);
-                const isSel  = activeDay === row.day;
+                const isSel = activeDay === row.day;
                 return (
                   <div key={row.day} className="h-full w-full flex min-w-16 flex-1 flex-col items-center justify-end gap-2">
                     <button type="button" onClick={() => setActiveDay(prev => prev === row.day ? null : row.day)}
@@ -786,6 +738,64 @@ export default function Zohoone() {
             )}
           </div>
         </section>
+      </div>
+
+      <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+        {loading ? (
+          <div className="p-12 text-center">
+            <div className="animate-spin w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto" />
+          </div>
+        ) : overviewFiltered.length === 0 ? (
+          <div className="p-12 text-center text-[var(--muted)]">
+            {tickets.length === 0
+              ? 'No tickets found. Click "Sync from Zoho" to fetch tickets.'
+              : 'No tickets match your search.'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--muted-bg)] text-left">
+                  {['#', 'Subject', 'Status', 'Priority', 'Department', 'Contact', 'Assignee', 'Created'].map(h => (
+                    <th key={h} className="px-4 py-3 text-xs font-semibold text-[var(--muted)] uppercase tracking-wide whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--card-border)]">
+                {overviewFiltered.slice(0, 100).map((t, i) => (
+                  <tr key={t.id || i} className="hover:bg-[var(--muted-bg)] transition-colors">
+                    <td className="px-4 py-3 text-xs text-[var(--muted)]">{t.ticketNumber || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-[var(--foreground)] max-w-xs truncate">{t.subject || '—'}</td>
+                    <td className="px-4 py-3">
+                      <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                        backgroundColor: `${STATUS_COLORS[t.status] || '#6b7280'}22`,
+                        color: STATUS_COLORS[t.status] || '#6b7280',
+                      }}>{t.status || '—'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {t.priority && t.priority !== '—'
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
+                          backgroundColor: `${PRIORITY_COLORS[t.priority] || '#6b7280'}22`,
+                          color: PRIORITY_COLORS[t.priority] || '#6b7280',
+                        }}>{t.priority}</span>
+                        : <span className="text-[var(--muted)]">—</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-[var(--muted)] text-xs max-w-[120px] truncate">{getDeptName(t)}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-[120px] truncate">{getContactName(t)}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] max-w-[120px] truncate">{getAssigneeName(t)}</td>
+                    <td className="px-4 py-3 text-[var(--muted)] text-xs whitespace-nowrap">{getCreatedAt(t) ? timeAgo(getCreatedAt(t)) : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {overviewFiltered.length > 100 && (
+              <p className="px-4 py-3 text-xs text-center text-[var(--muted)] border-t border-[var(--card-border)]">
+                Showing 100 of {overviewFiltered.length} tickets
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

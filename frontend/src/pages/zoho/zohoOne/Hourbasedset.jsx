@@ -49,7 +49,9 @@ export default function Hourbasedset({ tickets }) {
   return (
     <div className="w-full bg-white rounded-xl shadow-sm border p-6">
       <h2 className="text-xl font-semibold text-gray-800 mb-6">Ticket Creation Heatmap</h2>
-      <div className="overflow-x-auto overflow-y-visible flex items-center justify-center">
+
+      {/* Scroll container — no flex/centering here, or overflowing content gets clipped on both edges */}
+      <div className="overflow-x-auto">
         <div style={{ minWidth: LABEL_WIDTH + HOURS.length * (CELL_SIZE + 4) }}>
           <div className="flex mb-4">
             <div style={{ width: LABEL_WIDTH }} />

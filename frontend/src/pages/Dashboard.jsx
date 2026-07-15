@@ -46,6 +46,63 @@ function Empty({ msg }) {
   );
 }
 
+// ── Date range filter (per-card) ───────────────────────────────────────────────
+function DateRangeMini({ from, to, onChange }) {
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <input
+        type="date"
+        value={from || ''}
+        max={to || undefined}
+        onChange={(e) => onChange({ from: e.target.value, to })}
+        className="h-6 px-1 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[9px] leading-none text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400 w-[86px]"
+        title="From date"
+      />
+      <span className="text-[9px] text-[var(--muted)]">–</span>
+      <input
+        type="date"
+        value={to || ''}
+        min={from || undefined}
+        onChange={(e) => onChange({ from, to: e.target.value })}
+        className="h-6 px-1 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[9px] leading-none text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400 w-[86px]"
+        title="To date"
+      />
+      {(from || to) && (
+        <button
+          onClick={() => onChange({ from: '', to: '' })}
+          className="w-4 h-4 flex items-center justify-center rounded text-[var(--muted)] hover:text-red-500 flex-shrink-0"
+          title="Clear date filter"
+        >
+          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Inclusive date-range check. If no filter is set, everything passes.
+function inDateRange(dateVal, from, to) {
+  if (!from && !to) return true;
+  if (!dateVal) return false;
+  const d = new Date(dateVal).getTime();
+  if (Number.isNaN(d)) return false;
+  if (from && d < new Date(from).getTime()) return false;
+  if (to && d > new Date(to).getTime() + 86399999) return false; // include entire "to" day
+  return true;
+}
+
+// Best-effort date field lookup for records whose shape we don't fully control.
+function guessDateValue(obj) {
+  if (!obj || typeof obj !== 'object') return null;
+  const candidates = [
+    'createdAt', 'created_at', 'updatedAt', 'updated_at', 'timestamp',
+    'date', 'eventTime', 'event_time', 'detectedAt', 'lastSeen', 'last_seen',
+    'firstSeen', 'first_seen', 'lastActiveDate', 'registeredAt',
+  ];
+  for (const c of candidates) if (obj[c]) return obj[c];
+  return null;
+}
+
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8 };
 
 const NEWS_SECTIONS = [
@@ -158,6 +215,16 @@ export default function Dashboard() {
   // ── News ─────────────────────────────────────────────────────────────────────
   const [newsData, setNewsData] = useState({ cyber: [], threats: [], breaches: [] });
   const [newsLoading, setNewsLoading] = useState({ cyber: true, threats: true, breaches: true });
+
+  // ── Per-card date filters ───────────────────────────────────────────────────
+  // Keyed by a stable card id, e.g. 's1-mitigation', `cp-${widgetId}`, `fw-${widgetId}`, `news-${sectionKey}`.
+  const [cardRanges, setCardRanges] = useState({});
+  const cardRangesRef = useRef({});
+  useEffect(() => { cardRangesRef.current = cardRanges; }, [cardRanges]);
+  const getRange = useCallback((key) => cardRanges[key] || { from: '', to: '' }, [cardRanges]);
+  const setRange = useCallback((key, val) => {
+    setCardRanges((prev) => ({ ...prev, [key]: val }));
+  }, []);
 
   // ── Grid layout ──────────────────────────────────────────────────────────────
   const [boxes, setBoxes] = useState(DEFAULT_BOXES);
@@ -324,16 +391,22 @@ export default function Dashboard() {
   }, [fwRaw]);
 
   // ── News feed ──────────────────────────────────────────────────────────────────
+  // Refetches whenever a news section's own per-card date range changes.
+  const newsRangesKey = JSON.stringify(NEWS_SECTIONS.map((s) => cardRanges[`news-${s.key}`] || {}));
   useEffect(() => {
     if (!currentOrg) return;
     NEWS_SECTIONS.forEach(({ key, q }) => {
+      const range = cardRangesRef.current[`news-${key}`] || {};
       setNewsLoading((prev) => ({ ...prev, [key]: true }));
-      api.get(`/news?q=${encodeURIComponent(q)}&limit=8`)
+      const params = new URLSearchParams({ q, limit: '8' });
+      if (range.from) params.set('from', range.from);
+      if (range.to) params.set('to', range.to);
+      api.get(`/news?${params.toString()}`)
         .then((r) => setNewsData((prev) => ({ ...prev, [key]: r.data?.articles ?? [] })))
         .catch(() => setNewsData((prev) => ({ ...prev, [key]: [] })))
         .finally(() => setNewsLoading((prev) => ({ ...prev, [key]: false })));
     });
-  }, [currentOrg?.id]);
+  }, [currentOrg?.id, newsRangesKey]);
 
   // ── Section drag-to-reorder ────────────────────────────────────────────────────
   function moveSection(target) {
@@ -448,19 +521,42 @@ export default function Dashboard() {
     });
   }
 
-  // ── Derived data ───────────────────────────────────────────────────────────────
+  // ── Derived data (each per-card, filtered by that card's own date range) ──────
+  const mitigationRange = getRange('s1-mitigation');
+  const mitigationSourceData = s1Data.filter((t) => inDateRange(t.threatInfo?.createdAt, mitigationRange.from, mitigationRange.to));
   const mitigationCounts = {};
-  s1Data.forEach((t) => { const s = t.threatInfo?.mitigationStatus || 'unknown'; mitigationCounts[s] = (mitigationCounts[s] || 0) + 1; });
+  mitigationSourceData.forEach((t) => { const s = t.threatInfo?.mitigationStatus || 'unknown'; mitigationCounts[s] = (mitigationCounts[s] || 0) + 1; });
   const mitigationData = Object.entries(mitigationCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
   const mitigationTotal = mitigationData.reduce((s, d) => s + d.value, 0);
 
+  const severityRange = getRange('s1-severity');
+  const severitySourceData = s1Data.filter((t) => inDateRange(t.threatInfo?.createdAt, severityRange.from, severityRange.to));
   const severityCounts = {};
-  s1Data.forEach((t) => { const s = t.threatInfo?.confidenceLevel || 'unknown'; severityCounts[s] = (severityCounts[s] || 0) + 1; });
+  severitySourceData.forEach((t) => { const s = t.threatInfo?.confidenceLevel || 'unknown'; severityCounts[s] = (severityCounts[s] || 0) + 1; });
   const severityData = Object.entries(severityCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
 
-  const recentThreats = [...s1Data].sort((a, b) => new Date(b.threatInfo?.createdAt || 0) - new Date(a.threatInfo?.createdAt || 0)).slice(0, 15);
-  const activeAgents = agentData.filter((a) => a.isActive).length;
-  const inactiveAgents = agentData.filter((a) => !a.isActive).length;
+  const threatsRange = getRange('s1-threats');
+  const recentThreats = [...s1Data]
+    .filter((t) => inDateRange(t.threatInfo?.createdAt, threatsRange.from, threatsRange.to))
+    .sort((a, b) => new Date(b.threatInfo?.createdAt || 0) - new Date(a.threatInfo?.createdAt || 0))
+    .slice(0, 15);
+
+  const agentsRange = getRange('s1-agents');
+  const filteredAgentData = agentData.filter((a) => inDateRange(guessDateValue(a), agentsRange.from, agentsRange.to));
+  const activeAgents = filteredAgentData.filter((a) => a.isActive).length;
+  const inactiveAgents = filteredAgentData.filter((a) => !a.isActive).length;
+
+  const appAgentRange = getRange('s1-app-agent');
+  const filteredAppAgentData = appAgentData.filter((a) => inDateRange(guessDateValue(a), appAgentRange.from, appAgentRange.to));
+
+  const appCveRange = getRange('s1-app-cve');
+  const filteredAppCveData = appCveData.filter((a) => inDateRange(guessDateValue(a), appCveRange.from, appCveRange.to));
+
+  const deviceControlRange = getRange('s1-device-control');
+  const filteredDeviceControlData = deviceControlData.filter((a) => inDateRange(guessDateValue(a), deviceControlRange.from, deviceControlRange.to));
+
+  const rssRange = getRange('s1-rss');
+  const filteredRssData = rssData.filter((item) => inDateRange(item.published || item.pubDate || item.date || guessDateValue(item), rssRange.from, rssRange.to));
 
   const fwTable = fwRaw ? extractTable(fwRaw) : null;
   const fwColumns = fwTable?.columns ?? [];
@@ -723,7 +819,6 @@ export default function Dashboard() {
       )}
 
 
-
       {/* ── Section Grid ────────────────────────────────────────────────────── */}
       <div className="flex flex-col divide-y divide-[var(--card-border)]">
         {sectionOrder.map((section) => {
@@ -767,7 +862,8 @@ export default function Dashboard() {
                     {visibleCpWidgets.map((id, idx) => {
                       const opt = WIDGET_OPTIONS.find((w) => w.id === id);
                       if (!opt) return null;
-                      const filtered = cpEvents.filter((e) => opt.eventTypes.includes(e.type));
+                      const cpRange = getRange(`cp-${id}`);
+                      const filtered = cpEvents.filter((e) => opt.eventTypes.includes(e.type) && inDateRange(e.eventCreated, cpRange.from, cpRange.to));
                       const total = filtered.length;
                       const pending = filtered.filter((e) => e.state === 'new' || e.state === 'pending').length;
                       const remediated = filtered.filter((e) => ['remediated', 'closed', 'done'].includes(e.state)).length;
@@ -786,7 +882,11 @@ export default function Dashboard() {
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
                           </div>
-                          <div className="p-4">
+                          <div className="px-4 pt-2.5 pb-1 flex items-center justify-between">
+                            <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                            <DateRangeMini from={cpRange.from} to={cpRange.to} onChange={(v) => setRange(`cp-${id}`, v)} />
+                          </div>
+                          <div className="p-4 pt-2">
                             {cpEventsLoading ? (
                               <div className="flex items-center justify-center py-4"><div className="animate-spin w-5 h-5 border-4 border-indigo-500 border-t-transparent rounded-full" /></div>
                             ) : total === 0 ? (
@@ -913,7 +1013,12 @@ export default function Dashboard() {
                             className={`w-5 h-5 flex items-center justify-center rounded text-[var(--muted)] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors ml-1 flex-shrink-0 ${isEditMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
+                          
                         </div>
+                      </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={mitigationRange.from} to={mitigationRange.to} onChange={(v) => setRange('s1-mitigation', v)} />
                       </div>
                       <div className="flex-1 min-h-0 p-3 relative">
                         {s1Loading ? <Spin /> : s1Error ? <Err msg={s1Error} /> : mitigationData.length === 0 ? <Empty msg="No mitigation data" /> :
@@ -965,6 +1070,10 @@ export default function Dashboard() {
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={severityRange.from} to={severityRange.to} onChange={(v) => setRange('s1-severity', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 p-3">
                         {s1Loading ? <Spin /> : s1Error ? <Err msg={s1Error} /> : severityData.length === 0 ? <Empty msg="No severity data" /> : (
                           <ResponsiveContainer width="100%" height="100%">
@@ -987,6 +1096,10 @@ export default function Dashboard() {
                         <button onClick={(e) => { e.stopPropagation(); removeS1Widget('s1-threats'); }} className={`w-5 h-5 flex items-center justify-center rounded text-[var(--muted)] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors ml-1 flex-shrink-0 ${isEditMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
+                      </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={threatsRange.from} to={threatsRange.to} onChange={(v) => setRange('s1-threats', v)} />
                       </div>
                       <div className="flex-1 min-h-0 overflow-auto">
                         {s1Loading ? <Spin /> : s1Error ? <Err msg={s1Error} /> : recentThreats.length === 0 ? <Empty msg="No threats found" /> : (
@@ -1034,8 +1147,12 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={agentsRange.from} to={agentsRange.to} onChange={(v) => setRange('s1-agents', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 overflow-auto">
-                        {agentLoading ? <Spin /> : agentError ? <Err msg={agentError} /> : agentData.length === 0 ? <Empty msg="No agent info found" /> : (
+                        {agentLoading ? <Spin /> : agentError ? <Err msg={agentError} /> : filteredAgentData.length === 0 ? <Empty msg="No agent info found" /> : (
                           <table className="w-full text-xs">
                             <thead className="sticky top-0 z-10 bg-[var(--muted-bg)]">
                               <tr>
@@ -1044,7 +1161,7 @@ export default function Dashboard() {
                               </tr>
                             </thead>
                             <tbody>
-                              {agentData.map((a, i) => (
+                              {filteredAgentData.map((a, i) => (
                                 <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
                                   <td className="px-3 py-2 border-b border-[var(--card-border)] text-[var(--muted)] whitespace-nowrap">{a.computerName || '—'}</td>
                                   <td className="px-3 py-2 border-b border-[var(--card-border)]">
@@ -1063,7 +1180,7 @@ export default function Dashboard() {
                       <div className="drag-handle cursor-grab active:cursor-grabbing bg-[var(--muted-bg)] border-b border-[var(--card-border)] px-4 py-3 flex items-center justify-between flex-shrink-0 select-none">
                         <div><p className="text-xs text-[var(--muted)] font-medium">SentinelOne</p><p className="text-sm font-bold text-[var(--foreground)]">Application Agents</p></div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">{appAgentData.length} records</span>
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">{filteredAppAgentData.length} records</span>
                           <div className="flex items-center gap-0.5 bg-[var(--card-bg)] rounded-lg p-0.5 border border-[var(--card-border)]">
                             <button onClick={(e) => { e.stopPropagation(); setS1WidgetConfigs((p) => ({ ...p, 's1-app-agent': { ...(p['s1-app-agent'] ?? { id: 's1-app-agent', viewMode: 'table' }), viewMode: 'graph' } })); }}
                               className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${s1WidgetConfigs['s1-app-agent']?.viewMode === 'graph' ? 'bg-emerald-500 text-white' : 'text-[var(--muted)] hover:text-[var(--foreground)]'}`}>Graph</button>
@@ -1075,8 +1192,12 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={appAgentRange.from} to={appAgentRange.to} onChange={(v) => setRange('s1-app-agent', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 overflow-hidden">
-                        <S1ConfigWidget data={appAgentData} loading={appAgentLoading} config={s1WidgetConfigs['s1-app-agent'] ?? { id: 's1-app-agent', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-app-agent': { ...(p['s1-app-agent'] ?? { id: 's1-app-agent', viewMode: 'table' }), ...patch } }))} accentColor="#a855f7" />
+                        <S1ConfigWidget data={filteredAppAgentData} loading={appAgentLoading} config={s1WidgetConfigs['s1-app-agent'] ?? { id: 's1-app-agent', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-app-agent': { ...(p['s1-app-agent'] ?? { id: 's1-app-agent', viewMode: 'table' }), ...patch } }))} accentColor="#a855f7" />
                       </div>
                     </div>
 
@@ -1085,7 +1206,7 @@ export default function Dashboard() {
                       <div className="drag-handle cursor-grab active:cursor-grabbing bg-[var(--muted-bg)] border-b border-[var(--card-border)] px-4 py-3 flex items-center justify-between flex-shrink-0 select-none">
                         <div><p className="text-xs text-[var(--muted)] font-medium">SentinelOne</p><p className="text-sm font-bold text-[var(--foreground)]">Application CVEs</p></div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{appCveData.length} CVEs</span>
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">{filteredAppCveData.length} CVEs</span>
                           <div className="flex items-center gap-0.5 bg-[var(--card-bg)] rounded-lg p-0.5 border border-[var(--card-border)]">
                             <button onClick={(e) => { e.stopPropagation(); setS1WidgetConfigs((p) => ({ ...p, 's1-app-cve': { ...(p['s1-app-cve'] ?? { id: 's1-app-cve', viewMode: 'table' }), viewMode: 'graph' } })); }}
                               className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${s1WidgetConfigs['s1-app-cve']?.viewMode === 'graph' ? 'bg-emerald-500 text-white' : 'text-[var(--muted)] hover:text-[var(--foreground)]'}`}>Graph</button>
@@ -1097,8 +1218,12 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={appCveRange.from} to={appCveRange.to} onChange={(v) => setRange('s1-app-cve', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 overflow-hidden">
-                        <S1ConfigWidget data={appCveData} loading={appCveLoading} config={s1WidgetConfigs['s1-app-cve'] ?? { id: 's1-app-cve', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-app-cve': { ...(p['s1-app-cve'] ?? { id: 's1-app-cve', viewMode: 'table' }), ...patch } }))} accentColor="#ef4444" />
+                        <S1ConfigWidget data={filteredAppCveData} loading={appCveLoading} config={s1WidgetConfigs['s1-app-cve'] ?? { id: 's1-app-cve', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-app-cve': { ...(p['s1-app-cve'] ?? { id: 's1-app-cve', viewMode: 'table' }), ...patch } }))} accentColor="#ef4444" />
                       </div>
                     </div>
 
@@ -1107,7 +1232,7 @@ export default function Dashboard() {
                       <div className="drag-handle cursor-grab active:cursor-grabbing bg-[var(--muted-bg)] border-b border-[var(--card-border)] px-4 py-3 flex items-center justify-between flex-shrink-0 select-none">
                         <div><p className="text-xs text-[var(--muted)] font-medium">SentinelOne</p><p className="text-sm font-bold text-[var(--foreground)]">Device Control</p></div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{deviceControlData.length} events</span>
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">{filteredDeviceControlData.length} events</span>
                           <div className="flex items-center gap-0.5 bg-[var(--card-bg)] rounded-lg p-0.5 border border-[var(--card-border)]">
                             <button onClick={(e) => { e.stopPropagation(); setS1WidgetConfigs((p) => ({ ...p, 's1-device-control': { ...(p['s1-device-control'] ?? { id: 's1-device-control', viewMode: 'table' }), viewMode: 'graph' } })); }}
                               className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-colors ${s1WidgetConfigs['s1-device-control']?.viewMode === 'graph' ? 'bg-emerald-500 text-white' : 'text-[var(--muted)] hover:text-[var(--foreground)]'}`}>Graph</button>
@@ -1119,8 +1244,12 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={deviceControlRange.from} to={deviceControlRange.to} onChange={(v) => setRange('s1-device-control', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 overflow-hidden">
-                        <S1ConfigWidget data={deviceControlData} loading={deviceControlLoading} config={s1WidgetConfigs['s1-device-control'] ?? { id: 's1-device-control', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-device-control': { ...(p['s1-device-control'] ?? { id: 's1-device-control', viewMode: 'table' }), ...patch } }))} accentColor="#6366f1" />
+                        <S1ConfigWidget data={filteredDeviceControlData} loading={deviceControlLoading} config={s1WidgetConfigs['s1-device-control'] ?? { id: 's1-device-control', viewMode: 'table' }} onConfigChange={(patch) => setS1WidgetConfigs((p) => ({ ...p, 's1-device-control': { ...(p['s1-device-control'] ?? { id: 's1-device-control', viewMode: 'table' }), ...patch } }))} accentColor="#6366f1" />
                       </div>
                     </div>
 
@@ -1129,16 +1258,20 @@ export default function Dashboard() {
                       <div className="drag-handle cursor-grab active:cursor-grabbing bg-[var(--muted-bg)] border-b border-[var(--card-border)] px-4 py-3 flex items-center justify-between flex-shrink-0 select-none">
                         <div><p className="text-xs text-[var(--muted)] font-medium">SentinelOne</p><p className="text-sm font-bold text-[var(--foreground)]">RSS Feed</p></div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">{rssData.length} items</span>
+                          <span className="px-2 py-0.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">{filteredRssData.length} items</span>
                           <button onClick={(e) => { e.stopPropagation(); removeS1Widget('s1-rss'); }} className={`w-5 h-5 flex items-center justify-center rounded text-[var(--muted)] hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors ml-1 flex-shrink-0 ${isEditMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           </button>
                         </div>
                       </div>
+                      <div className="px-4 pt-2 pb-0 flex items-center justify-between flex-shrink-0">
+                        <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                        <DateRangeMini from={rssRange.from} to={rssRange.to} onChange={(v) => setRange('s1-rss', v)} />
+                      </div>
                       <div className="flex-1 min-h-0 overflow-auto">
-                        {rssLoading ? <Spin /> : rssData.length === 0 ? <Empty msg="No RSS data — sync first" /> : (
+                        {rssLoading ? <Spin /> : filteredRssData.length === 0 ? <Empty msg="No RSS data — sync first" /> : (
                           <div className="divide-y divide-[var(--card-border)]">
-                            {rssData.slice(0, 20).map((item, i) => {
+                            {filteredRssData.slice(0, 20).map((item, i) => {
                               const title = item.title || item.name || 'Untitled';
                               const desc = item.summary || item.description || item.content || '';
                               const link = item.link || item.url || item.guid || null;
@@ -1169,79 +1302,88 @@ export default function Dashboard() {
           );
 
           /* ─ FIREWALL ─ */
-          // return (
-          //   <div key="firewall" onDragOver={(e) => { e.preventDefault(); moveSection('firewall'); }} className="group/sec">
-          //     <div className="pt-4 pb-5 relative z-10">
-          //       {/* Section header */}
-          //       <div
-          //         draggable
-          //         onDragStart={(e) => { e.stopPropagation(); dragSectionRef.current = 'firewall'; }}
-          //         onDragEnd={(e) => { e.stopPropagation(); dragSectionRef.current = null; }}
-          //         className="flex items-center gap-3 mb-3 cursor-move select-none rounded-xl px-3 py-2 transition-all duration-200 hover:bg-orange-50/50 dark:hover:bg-orange-900/10"
-          //       >
-          //         <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 flex-shrink-0 shadow-sm" />
-          //         <div className="flex items-center gap-2">
-          //           <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
-          //             <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
-          //           </div>
-          //           <div>
-          //             <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none">Network</p>
-          //             <h2 className="text-sm font-bold text-[var(--foreground)] leading-tight">Palo Alto Firewall</h2>
-          //           </div>
-          //         </div>
-          //         <div className="flex-1 h-px bg-gradient-to-r from-orange-200 via-[var(--card-border)] to-transparent dark:from-orange-800" />
-          //         <button onClick={(e) => { e.stopPropagation(); handleCollect(); }} disabled={collecting}
-          //           className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-all duration-150 flex-shrink-0 border border-orange-200 dark:border-orange-700">
-          //           {collecting
-          //             ? <><div className="animate-spin w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full" />Collecting…</>
-          //             : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Collect</>
-          //           }
-          //         </button>
-          //       </div>
+          return (
+            <div key="firewall" onDragOver={(e) => { e.preventDefault(); moveSection('firewall'); }} className="group/sec">
+              <div className="pt-4 pb-5 relative z-10">
+                {/* Section header */}
+                <div
+                  draggable
+                  onDragStart={(e) => { e.stopPropagation(); dragSectionRef.current = 'firewall'; }}
+                  onDragEnd={(e) => { e.stopPropagation(); dragSectionRef.current = null; }}
+                  className="flex items-center gap-3 mb-3 cursor-move select-none rounded-xl px-3 py-2 transition-all duration-200 hover:bg-orange-50/50 dark:hover:bg-orange-900/10"
+                >
+                  <div className="w-1.5 h-7 rounded-full bg-gradient-to-b from-orange-400 to-orange-600 flex-shrink-0 shadow-sm" />
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" /></svg>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest leading-none">Network</p>
+                      <h2 className="text-sm font-bold text-[var(--foreground)] leading-tight">Palo Alto Firewall</h2>
+                    </div>
+                  </div>
+                  <div className="flex-1 h-px bg-gradient-to-r from-orange-200 via-[var(--card-border)] to-transparent dark:from-orange-800" />
+                  <button onClick={(e) => { e.stopPropagation(); handleCollect(); }} disabled={collecting}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-all duration-150 flex-shrink-0 border border-orange-200 dark:border-orange-700">
+                    {collecting
+                      ? <><div className="animate-spin w-3 h-3 border-2 border-orange-500 border-t-transparent rounded-full" />Collecting…</>
+                      : <><svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>Collect</>
+                    }
+                  </button>
+                </div>
 
-          //       {collectMsg && (
-          //         <div className={`mb-3 px-3 py-2 rounded-lg text-xs border flex items-center gap-2 ${collectMsg.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
-          //           <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collectMsg.ok ? 'M5 13l4 4L19 7' : 'M12 9v2m0 4h.01'} /></svg>
-          //           {collectMsg.text}
-          //         </div>
-          //       )}
-          //     </div>
+                {collectMsg && (
+                  <div className={`mb-3 px-3 py-2 rounded-lg text-xs border flex items-center gap-2 ${collectMsg.ok ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'}`}>
+                    <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={collectMsg.ok ? 'M5 13l4 4L19 7' : 'M12 9v2m0 4h.01'} /></svg>
+                    {collectMsg.text}
+                  </div>
+                )}
+              </div>
 
-          //     {/* Firewall widget grid */}
-          //     {fwWidgets.length === 0 ? (
-          //       <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-orange-200 dark:border-orange-800 rounded-2xl bg-orange-50/30 dark:bg-orange-900/10 mb-4">
-          //         <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center mb-3">
-          //           <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" /></svg>
-          //         </div>
-          //         <p className="text-sm font-semibold text-[var(--foreground)] mb-1">No firewall widgets</p>
-          //         <p className="text-xs text-[var(--muted)]">Click "Add Widget" → Palo Alto Firewall to create charts</p>
-          //       </div>
-          //     ) : (
-          //       <div className="w-full min-w-0" onDragStart={(e) => e.stopPropagation()}>
-          //         <ResponsiveGridLayout
-          //           className="layout"
-          //           layouts={fwLayouts}
-          //           breakpoints={GRID_BREAKPOINTS}
-          //           cols={GRID_COLS}
-          //           rowHeight={10}
-          //           width={containerWidth}
-          //           onLayoutChange={handleLayoutChange}
-          //           onBreakpointChange={(bp) => setActiveGridBreakpoint(bp)}
-          //           compactor={noCompactor}
-          //           dragConfig={{ enabled: isEditMode, handle: '.drag-handle' }}
-          //           resizeConfig={{ enabled: isEditMode, handles: ['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'] }}
-          //           margin={[10, 10]}
-          //         >
-          //           {fwWidgets.map((widget) => (
-          //             <div key={widget.id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden">
-          //               <FwGraphWidget widget={widget} onDelete={handleDeleteFwWidget} isEditMode={isEditMode} />
-          //             </div>
-          //           ))}
-          //         </ResponsiveGridLayout>
-          //       </div>
-          //     )}
-          //   </div>
-          // );
+              {/* Firewall widget grid */}
+              {fwWidgets.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-orange-200 dark:border-orange-800 rounded-2xl bg-orange-50/30 dark:bg-orange-900/10 mb-4">
+                  <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center mb-3">
+                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" /></svg>
+                  </div>
+                  <p className="text-sm font-semibold text-[var(--foreground)] mb-1">No firewall widgets</p>
+                  <p className="text-xs text-[var(--muted)]">Click "Add Widget" → Palo Alto Firewall to create charts</p>
+                </div>
+              ) : (
+                <div className="w-full min-w-0" onDragStart={(e) => e.stopPropagation()}>
+                  <ResponsiveGridLayout
+                    className="layout"
+                    layouts={fwLayouts}
+                    breakpoints={GRID_BREAKPOINTS}
+                    cols={GRID_COLS}
+                    rowHeight={10}
+                    width={containerWidth}
+                    onLayoutChange={handleLayoutChange}
+                    onBreakpointChange={(bp) => setActiveGridBreakpoint(bp)}
+                    compactor={noCompactor}
+                    dragConfig={{ enabled: isEditMode, handle: '.drag-handle' }}
+                    resizeConfig={{ enabled: isEditMode, handles: ['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'] }}
+                    margin={[10, 10]}
+                  >
+                    {fwWidgets.map((widget) => {
+                      const fwRange = getRange(`fw-${widget.id}`);
+                      return (
+                        <div key={widget.id} className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden flex flex-col">
+                          <div className="flex items-center justify-between px-3 pt-2 pb-1 flex-shrink-0">
+                            <span className="text-[9px] font-semibold text-[var(--muted)] uppercase tracking-wider">Date range</span>
+                            <DateRangeMini from={fwRange.from} to={fwRange.to} onChange={(v) => setRange(`fw-${widget.id}`, v)} />
+                          </div>
+                          <div className="flex-1 min-h-0">
+                            <FwGraphWidget widget={widget} onDelete={handleDeleteFwWidget} isEditMode={isEditMode} dateFrom={fwRange.from} dateTo={fwRange.to} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </ResponsiveGridLayout>
+                </div>
+              )}
+            </div>
+          );
         })}
       </div>
 
@@ -1251,8 +1393,12 @@ export default function Dashboard() {
         <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Zoho Ticket Dashboard</h2>
         <ZohoTicketMatrix />
       </div>
+
+
       {/* ── News Sections ───────────────────────────────────────────────────── */}
-      {NEWS_SECTIONS.map((section) => (
+      {NEWS_SECTIONS.map((section) => {
+        const newsRange = getRange(`news-${section.key}`);
+        return (
         <div key={section.key} className="mt-8 mb-2">
           {/* Section header */}
           <div className="flex items-center gap-3 mb-4">
@@ -1269,6 +1415,7 @@ export default function Dashboard() {
               </div>
             </div>
             <div className={`flex-1 h-px bg-gradient-to-r ${section.lineFrom} via-[var(--card-border)] to-transparent`} />
+            <DateRangeMini from={newsRange.from} to={newsRange.to} onChange={(v) => setRange(`news-${section.key}`, v)} />
           </div>
 
           {/* Card grid */}
@@ -1286,7 +1433,8 @@ export default function Dashboard() {
             }
           </div>
         </div>
-      ))}
+        );
+      })}
 
 
     </div>
