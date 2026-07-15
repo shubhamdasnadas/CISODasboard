@@ -74,6 +74,42 @@ function KpiCard({ title, value, subtitle, accent, onClick }) {
   );
 }
 
+function DateFilter({ from, to, onFromChange, onToChange, onClear }) {
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <input type="date" value={from} max={to || undefined}
+        onChange={(e) => onFromChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      <span className="text-[10px] text-[var(--muted)]">→</span>
+      <input type="date" value={to} min={from || undefined}
+        onChange={(e) => onToChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      {(from || to) && (
+        <button onClick={onClear} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">✕</button>
+      )}
+    </div>
+  );
+}
+
+function useCardFilter(threats) {
+  const [from, setFrom] = useState('');
+  const [to, setTo]     = useState('');
+  const filtered = useMemo(() => {
+    if (!from && !to) return threats;
+    const f = from ? new Date(from) : null;
+    const t = to   ? new Date(to + 'T23:59:59') : null;
+    return threats.filter((x) => {
+      const d = parseDate(x.threatInfo?.createdAt);
+      if (!d) return false;
+      if (f && d < f) return false;
+      if (t && d > t) return false;
+      return true;
+    });
+  }, [threats, from, to]);
+  const clear = () => { setFrom(''); setTo(''); };
+  return { from, to, setFrom, setTo, clear, filtered };
+}
+
 function ChartCard({ title, subtitle, controls, children, height = 260 }) {
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
@@ -139,27 +175,39 @@ export default function Threats() {
   const navigate = useNavigate();
   const [threats, setThreats] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [trendFrom, setTrendFrom] = useState('');
-  const [trendTo, setTrendTo]   = useState('');
-  const [mitreFrom, setMitreFrom] = useState('');
-  const [mitreTo, setMitreTo]   = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
 
   useEffect(() => {
+    setLoading(true);
     api.get('/sentinelone/db/threats')
       .then((r) => setThreats(r.data?.data || r.data?.threats || []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const filteredThreats = useMemo(() => {
+    if (!dateFrom && !dateTo) return threats;
+    const from = dateFrom ? new Date(dateFrom) : null;
+    const to   = dateTo   ? new Date(dateTo + 'T23:59:59') : null;
+    return threats.filter((t) => {
+      const d = parseDate(t.threatInfo?.createdAt);
+      if (!d) return false;
+      if (from && d < from) return false;
+      if (to   && d > to)   return false;
+      return true;
+    });
+  }, [threats, dateFrom, dateTo]);
+
   const kpis = useMemo(() => {
-    const total      = threats.length;
-    const mitigated  = threats.filter((t) => t.threatInfo?.mitigationStatus === 'mitigated').length;
-    const unresolved = threats.filter((t) => ['unresolved','active'].includes(t.threatInfo?.incidentStatus)).length;
-    const fileless   = threats.filter((t) => t.threatInfo?.isFileless).length;
+    const total      = filteredThreats.length;
+    const mitigated  = filteredThreats.filter((t) => t.threatInfo?.mitigationStatus === 'mitigated').length;
+    const unresolved = filteredThreats.filter((t) => ['unresolved','active'].includes(t.threatInfo?.incidentStatus)).length;
+    const fileless   = filteredThreats.filter((t) => t.threatInfo?.isFileless).length;
 
     let mttdSum = 0, mttdCount = 0;
     let mttmSum = 0, mttmCount = 0;
-    threats.forEach((t) => {
+    filteredThreats.forEach((t) => {
       const created    = parseDate(t.threatInfo?.createdAt);
       const identified = parseDate(t.threatInfo?.identifiedAt);
       if (created && identified) { mttdSum += (created - identified) / 60000; mttdCount++; }
@@ -174,36 +222,42 @@ export default function Threats() {
       avgMttd: mttdCount > 0 ? mttdSum / mttdCount : 0,
       avgMttm: mttmCount > 0 ? mttmSum / mttmCount : 0,
     };
-  }, [threats]);
+  }, [filteredThreats]);
 
-  const threatTrend = useMemo(() => {
+  const trendFilter      = useCardFilter(threats);
+  const endpointFilter   = useCardFilter(threats);
+  const mitreFilter      = useCardFilter(threats);
+  const matrixFilter     = useCardFilter(threats);
+  const classFilter      = useCardFilter(threats);
+  const filelessFilter   = useCardFilter(threats);
+  const mitigFilter      = useCardFilter(threats);
+  const usersFilter      = useCardFilter(threats);
+  const severityFilter   = useCardFilter(threats);
+  const mttdFilter       = useCardFilter(threats);
+  const mttmFilter       = useCardFilter(threats);
+  const siteFilter       = useCardFilter(threats);
+  const groupFilter      = useCardFilter(threats);
+
+  const filteredThreatTrend = useMemo(() => {
     const counts = {};
-    threats.forEach((t) => {
+    trendFilter.filtered.forEach((t) => {
       const d = parseDate(t.threatInfo?.createdAt);
       if (!d) return;
       const key = d.toISOString().slice(0, 10);
       counts[key] = (counts[key] || 0) + 1;
     });
     return Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).map(([date, count]) => ({ date, count }));
-  }, [threats]);
-
-  const filteredThreatTrend = useMemo(() => {
-    return threatTrend.filter((r) => {
-      if (trendFrom && r.date < trendFrom) return false;
-      if (trendTo   && r.date > trendTo)   return false;
-      return true;
-    });
-  }, [threatTrend, trendFrom, trendTo]);
+  }, [trendFilter.filtered]);
 
   const topEndpoints = useMemo(() => {
     const c = {};
-    threats.forEach((t) => { const k = t.agentRealtimeInfo?.agentComputerName; if (k) c[k] = (c[k] || 0) + 1; });
+    endpointFilter.filtered.forEach((t) => { const k = t.agentRealtimeInfo?.agentComputerName; if (k) c[k] = (c[k] || 0) + 1; });
     return topN(c, 10).map((x) => ({ ...x, fullName: x.name, name: truncateLabel(x.name) }));
-  }, [threats]);
+  }, [endpointFilter.filtered]);
 
   const mitreData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => {
+    mitreFilter.filtered.forEach((t) => {
       (t.indicators || []).forEach((ind) => {
         (ind.tactics || []).forEach((tac) => {
           (tac.techniques || []).forEach((tech) => { if (tech.name) c[tech.name] = (c[tech.name] || 0) + 1; });
@@ -211,27 +265,11 @@ export default function Threats() {
       });
     });
     return topN(c, 10).map((x) => ({ ...x, fullName: x.name, name: truncateLabel(x.name) }));
-  }, [threats]);
+  }, [mitreFilter.filtered]);
 
   const mitreMatrix = useMemo(() => {
-    // S1's own tactic labels don't always match official ATT&CK tactic names
-    // (e.g. "Stealth", "Defense Impairment" are S1-specific groupings, not
-    // among the 14 canonical tactics) — those are kept as their own columns
-    // rather than merged into a generic bucket, so real, sizeable categories
-    // in the data aren't hidden.
-    const mitreFilteredThreats = (mitreFrom || mitreTo)
-      ? threats.filter((t) => {
-          const d = parseDate(t.threatInfo?.createdAt);
-          if (!d) return false;
-          const key = d.toISOString().slice(0, 10);
-          if (mitreFrom && key < mitreFrom) return false;
-          if (mitreTo   && key > mitreTo)   return false;
-          return true;
-        })
-      : threats;
-
     const byTactic = {};
-    mitreFilteredThreats.forEach((t) => {
+    matrixFilter.filtered.forEach((t) => {
       const isUnresolved = ['unresolved', 'active'].includes(t.threatInfo?.incidentStatus);
       (t.indicators || []).forEach((ind) => {
         (ind.tactics || []).forEach((tac) => {
@@ -274,48 +312,48 @@ export default function Threats() {
     });
 
     return { columns };
-  }, [threats, mitreFrom, mitreTo]);
+  }, [matrixFilter.filtered]);
 
   const classificationData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => { const k = t.threatInfo?.classification || 'Unknown'; c[k] = (c[k] || 0) + 1; });
+    classFilter.filtered.forEach((t) => { const k = t.threatInfo?.classification || 'Unknown'; c[k] = (c[k] || 0) + 1; });
     return Object.entries(c).map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }));
-  }, [threats]);
+  }, [classFilter.filtered]);
 
   const filelessData = useMemo(() => {
-    const f = threats.filter((t) => t.threatInfo?.isFileless).length;
+    const f = filelessFilter.filtered.filter((t) => t.threatInfo?.isFileless).length;
     return [
-      { name: 'Fileless',   value: f,                  fill: '#ef4444' },
-      { name: 'File-based', value: threats.length - f,  fill: '#3b82f6' },
+      { name: 'Fileless',   value: f,                                    fill: '#ef4444' },
+      { name: 'File-based', value: filelessFilter.filtered.length - f,   fill: '#3b82f6' },
     ];
-  }, [threats]);
+  }, [filelessFilter.filtered]);
 
   const mitigationRateData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => {
+    mitigFilter.filtered.forEach((t) => {
       (t.mitigationStatus || []).forEach((s) => { if (s.status) c[s.status] = (c[s.status] || 0) + 1; });
     });
     return Object.entries(c).map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }));
-  }, [threats]);
+  }, [mitigFilter.filtered]);
 
   const topUsersData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => { const k = t.threatInfo?.processUser; if (k) c[k] = (c[k] || 0) + 1; });
+    usersFilter.filtered.forEach((t) => { const k = t.threatInfo?.processUser; if (k) c[k] = (c[k] || 0) + 1; });
     return topN(c, 10).map((x) => ({ ...x, name: truncateLabel(x.name) }));
-  }, [threats]);
+  }, [usersFilter.filtered]);
 
   const severityData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => {
+    severityFilter.filtered.forEach((t) => {
       const k = t.threatInfo?.confidenceLevel || t.threatInfo?.classification || 'Unknown';
       c[k] = (c[k] || 0) + 1;
     });
     return Object.entries(c).map(([name, value], i) => ({ name, value, fill: CHART_COLORS[i % CHART_COLORS.length] }));
-  }, [threats]);
+  }, [severityFilter.filtered]);
 
   const mttdTrend = useMemo(() => {
     const byDay = {};
-    threats.forEach((t) => {
+    mttdFilter.filtered.forEach((t) => {
       const created    = parseDate(t.threatInfo?.createdAt);
       const identified = parseDate(t.threatInfo?.identifiedAt);
       if (!created || !identified) return;
@@ -326,11 +364,11 @@ export default function Threats() {
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
       .map(([date, { sum, count }]) => ({ date, avg: Math.round(sum / count) }));
-  }, [threats]);
+  }, [mttdFilter.filtered]);
 
   const mttmTrend = useMemo(() => {
     const byDay = {};
-    threats.forEach((t) => {
+    mttmFilter.filtered.forEach((t) => {
       const identified   = parseDate(t.threatInfo?.identifiedAt);
       const successEntry = (t.mitigationStatus || []).find((s) => s.status === 'success');
       if (!identified || !successEntry) return;
@@ -343,19 +381,19 @@ export default function Threats() {
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
       .map(([date, { sum, count }]) => ({ date, avg: Math.round(sum / count) }));
-  }, [threats]);
+  }, [mttmFilter.filtered]);
 
   const bySiteData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => { const k = t.agentRealtimeInfo?.siteName || 'Unknown'; c[k] = (c[k] || 0) + 1; });
+    siteFilter.filtered.forEach((t) => { const k = t.agentRealtimeInfo?.siteName || 'Unknown'; c[k] = (c[k] || 0) + 1; });
     return topN(c, 10).map((x) => ({ ...x, name: truncateLabel(x.name) }));
-  }, [threats]);
+  }, [siteFilter.filtered]);
 
   const byGroupData = useMemo(() => {
     const c = {};
-    threats.forEach((t) => { const k = t.agentRealtimeInfo?.groupName || 'Unknown'; c[k] = (c[k] || 0) + 1; });
+    groupFilter.filtered.forEach((t) => { const k = t.agentRealtimeInfo?.groupName || 'Unknown'; c[k] = (c[k] || 0) + 1; });
     return topN(c, 10).map((x) => ({ ...x, name: truncateLabel(x.name) }));
-  }, [threats]);
+  }, [groupFilter.filtered]);
 
   if (loading) {
     return (
@@ -377,55 +415,43 @@ export default function Threats() {
     );
   }
 
-  const trendControls = (
-    <>
-      <div className="flex items-center gap-1.5">
-        <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
-        <input type="date" value={trendFrom} max={trendTo || undefined}
-          onChange={(e) => setTrendFrom(e.target.value)}
-          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-      </div>
-      <div className="flex items-center gap-1.5">
-        <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
-        <input type="date" value={trendTo} min={trendFrom || undefined}
-          onChange={(e) => setTrendTo(e.target.value)}
-          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-      </div>
-      {(trendFrom || trendTo) && (
-        <button onClick={() => { setTrendFrom(''); setTrendTo(''); }}
-          className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
-      )}
-    </>
-  );
 
-  const mitreControls = (
-    <>
-      <div className="flex items-center gap-1.5">
-        <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
-        <input type="date" value={mitreFrom} max={mitreTo || undefined}
-          onChange={(e) => setMitreFrom(e.target.value)}
-          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-      </div>
-      <div className="flex items-center gap-1.5">
-        <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
-        <input type="date" value={mitreTo} min={mitreFrom || undefined}
-          onChange={(e) => setMitreTo(e.target.value)}
-          className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-      </div>
-      {(mitreFrom || mitreTo) && (
-        <button onClick={() => { setMitreFrom(''); setMitreTo(''); }}
-          className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
-      )}
-    </>
-  );
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">Threat Analytics</h1>
-        <p className="text-sm text-[var(--muted)] mt-0.5">{kpis.total} threats · SentinelOne</p>
+      {/* Header + Global Date Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">Threat Analytics</h1>
+          <p className="text-sm text-[var(--muted)] mt-0.5">
+            {kpis.total} threats · SentinelOne
+            {(dateFrom || dateTo) && (
+              <span className="ml-2 text-indigo-500 font-medium">
+                {dateFrom && dateTo ? `${dateFrom} → ${dateTo}` : dateFrom ? `From ${dateFrom}` : `Until ${dateTo}`}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--muted)] font-medium">From</label>
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--muted)] font-medium">To</label>
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
+        </div>
       </div>
 
       {/* KPI row */}
@@ -441,7 +467,8 @@ export default function Threats() {
       </div>
 
       {/* Threat Trend */}
-      <ChartCard title="Threat Trend Over Time" subtitle="Daily new threats" controls={trendControls} height={260}>
+      <ChartCard title="Threat Trend Over Time" subtitle="Daily new threats" height={260}
+        controls={<DateFilter from={trendFilter.from} to={trendFilter.to} onFromChange={trendFilter.setFrom} onToChange={trendFilter.setTo} onClear={trendFilter.clear} />}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={filteredThreatTrend} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
@@ -455,7 +482,8 @@ export default function Threats() {
 
       {/* Top Endpoints + MITRE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title="Top Affected Endpoints" subtitle="Threat count per machine" height={300}>
+        <ChartCard title="Top Affected Endpoints" subtitle="Threat count per machine" height={300}
+          controls={<DateFilter from={endpointFilter.from} to={endpointFilter.to} onFromChange={endpointFilter.setFrom} onToChange={endpointFilter.setTo} onClear={endpointFilter.clear} />}>
           {topEndpoints.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -471,7 +499,8 @@ export default function Threats() {
           }
         </ChartCard>
 
-        <ChartCard title="MITRE ATT&CK Techniques" subtitle="Top techniques observed" height={300}>
+        <ChartCard title="MITRE ATT&CK Techniques" subtitle="Top techniques observed" height={300}
+          controls={<DateFilter from={mitreFilter.from} to={mitreFilter.to} onFromChange={mitreFilter.setFrom} onToChange={mitreFilter.setTo} onClear={mitreFilter.clear} />}>
           {mitreData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No MITRE data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -489,7 +518,8 @@ export default function Threats() {
       </div>
 
       {/* MITRE ATT&CK Matrix */}
-      <ChartCard title="MITRE ATT&CK Matrix" subtitle="Unresolved / total threats per technique" controls={mitreControls} height="auto">
+      <ChartCard title="MITRE ATT&CK Matrix" subtitle="Unresolved / total threats per technique" height="auto"
+        controls={<DateFilter from={matrixFilter.from} to={matrixFilter.to} onFromChange={matrixFilter.setFrom} onToChange={matrixFilter.setTo} onClear={matrixFilter.clear} />}>
         <MitreMatrix
           matrix={mitreMatrix.columns}
           onTechniqueClick={(name) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'mitreTechnique', value: name, title: `Threats using ${name}` } })}
@@ -499,7 +529,8 @@ export default function Threats() {
 
       {/* Classification + Fileless + Mitigation Outcomes */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <ChartCard title="Classification" height={240}>
+        <ChartCard title="Classification" height={240}
+          controls={<DateFilter from={classFilter.from} to={classFilter.to} onFromChange={classFilter.setFrom} onToChange={classFilter.setTo} onClear={classFilter.clear} />}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={classificationData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2} cursor="pointer"
@@ -512,7 +543,8 @@ export default function Threats() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Fileless vs File-based" height={240}>
+        <ChartCard title="Fileless vs File-based" height={240}
+          controls={<DateFilter from={filelessFilter.from} to={filelessFilter.to} onFromChange={filelessFilter.setFrom} onToChange={filelessFilter.setTo} onClear={filelessFilter.clear} />}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={filelessData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2}>
@@ -524,7 +556,8 @@ export default function Threats() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Mitigation Outcomes" height={240}>
+        <ChartCard title="Mitigation Outcomes" height={240}
+          controls={<DateFilter from={mitigFilter.from} to={mitigFilter.to} onFromChange={mitigFilter.setFrom} onToChange={mitigFilter.setTo} onClear={mitigFilter.clear} />}>
           {mitigationRateData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No mitigation data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -542,7 +575,8 @@ export default function Threats() {
 
       {/* Top Users + Severity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title="Top Users by Threat Count" height={280}>
+        <ChartCard title="Top Users by Threat Count" height={280}
+          controls={<DateFilter from={usersFilter.from} to={usersFilter.to} onFromChange={usersFilter.setFrom} onToChange={usersFilter.setTo} onClear={usersFilter.clear} />}>
           {topUsersData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No user data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -557,7 +591,8 @@ export default function Threats() {
           }
         </ChartCard>
 
-        <ChartCard title="Severity / Confidence Distribution" height={280}>
+        <ChartCard title="Severity / Confidence Distribution" height={280}
+          controls={<DateFilter from={severityFilter.from} to={severityFilter.to} onFromChange={severityFilter.setFrom} onToChange={severityFilter.setTo} onClear={severityFilter.clear} />}>
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={severityData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2}>
@@ -572,7 +607,8 @@ export default function Threats() {
 
       {/* MTTD + MTTM trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title="MTTD Trend" subtitle="Mean time to detect (minutes)" height={240}>
+        <ChartCard title="MTTD Trend" subtitle="Mean time to detect (minutes)" height={240}
+          controls={<DateFilter from={mttdFilter.from} to={mttdFilter.to} onFromChange={mttdFilter.setFrom} onToChange={mttdFilter.setTo} onClear={mttdFilter.clear} />}>
           {mttdTrend.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No MTTD data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -587,7 +623,8 @@ export default function Threats() {
           }
         </ChartCard>
 
-        <ChartCard title="MTTM Trend" subtitle="Mean time to mitigate (minutes)" height={240}>
+        <ChartCard title="MTTM Trend" subtitle="Mean time to mitigate (minutes)" height={240}
+          controls={<DateFilter from={mttmFilter.from} to={mttmFilter.to} onFromChange={mttmFilter.setFrom} onToChange={mttmFilter.setTo} onClear={mttmFilter.clear} />}>
           {mttmTrend.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No MTTM data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -605,7 +642,8 @@ export default function Threats() {
 
       {/* By Site + By Group */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ChartCard title="Threats by Site" height={280}>
+        <ChartCard title="Threats by Site" height={280}
+          controls={<DateFilter from={siteFilter.from} to={siteFilter.to} onFromChange={siteFilter.setFrom} onToChange={siteFilter.setTo} onClear={siteFilter.clear} />}>
           {bySiteData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No site data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
@@ -620,7 +658,8 @@ export default function Threats() {
           }
         </ChartCard>
 
-        <ChartCard title="Threats by Group" height={280}>
+        <ChartCard title="Threats by Group" height={280}
+          controls={<DateFilter from={groupFilter.from} to={groupFilter.to} onFromChange={groupFilter.setFrom} onToChange={groupFilter.setTo} onClear={groupFilter.clear} />}>
           {byGroupData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No group data</p></div>
             : <ResponsiveContainer width="100%" height="100%">

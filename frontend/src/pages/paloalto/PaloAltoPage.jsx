@@ -14,12 +14,11 @@ const REPORTS_TO_FETCH = [
   'risky-users','top-attacks','top-connections',
 ];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const parseNumber = (v) => {
   if (v === null || v === undefined || v === '') return 0;
-  const str = String(v).replace(/,/g, '').replace(/[^\d.-]/g, '').trim();
-  const n = Number(str);
+  const n = Number(String(v).replace(/,/g, '').replace(/[^\d.-]/g, '').trim());
   return Number.isFinite(n) ? n : 0;
 };
 
@@ -28,9 +27,9 @@ const formatNumber = (v) => Number(v || 0).toLocaleString('en-IN');
 const formatBytes = (v) => {
   const b = parseNumber(v);
   if (b >= 1e12) return `${(b / 1e12).toFixed(2)} TB`;
-  if (b >= 1e9) return `${(b / 1e9).toFixed(2)} GB`;
-  if (b >= 1e6) return `${(b / 1e6).toFixed(2)} MB`;
-  if (b >= 1e3) return `${(b / 1e3).toFixed(2)} KB`;
+  if (b >= 1e9)  return `${(b / 1e9).toFixed(2)} GB`;
+  if (b >= 1e6)  return `${(b / 1e6).toFixed(2)} MB`;
+  if (b >= 1e3)  return `${(b / 1e3).toFixed(2)} KB`;
   return `${b} B`;
 };
 
@@ -55,7 +54,10 @@ const extractTable = (raw) => {
       const colSet = new Set();
       entry.forEach(item => {
         if (typeof item === 'object' && item !== null)
-          Object.keys(item).forEach(k => { if (k === '@name') colSet.add('name'); else if (!k.startsWith('@')) colSet.add(k); });
+          Object.keys(item).forEach(k => {
+            if (k === '@name') colSet.add('name');
+            else if (!k.startsWith('@')) colSet.add(k);
+          });
       });
       const columns = Array.from(colSet);
       const rows = entry.map(item => {
@@ -63,7 +65,9 @@ const extractTable = (raw) => {
         columns.forEach(col => {
           const rk = col === 'name' ? '@name' : col;
           const value = item?.[rk] ?? item?.[col];
-          row[col] = typeof value === 'object' && value !== null && '#text' in value ? value['#text'] : value ?? '';
+          row[col] = typeof value === 'object' && value !== null && '#text' in value
+            ? value['#text']
+            : value ?? '';
         });
         return row;
       });
@@ -97,10 +101,6 @@ const getSumByColumn = (rows, cols) => {
 
 const getRowsByReport = (allReports, name) => allReports.find(r => r.report === name)?.rows ?? [];
 
-// Firewall reports don't carry a date query param server-side — the backend
-// always returns the same full snapshot regardless of startDate/endDate.
-// So the date filter is applied client-side against each row's own
-// timestamp column instead of re-fetching from the API.
 const DATE_COLS = ['slabbed-receive_time', 'receive_time', 'time_generated', 'time', 'date', 'updatedAt'];
 
 const getRowDate = (row) => {
@@ -110,14 +110,19 @@ const getRowDate = (row) => {
   return isNaN(d.getTime()) ? null : d;
 };
 
-const filterRowsByDate = (rows, dateRange) => {
-  if (!dateRange || (!dateRange.from && !dateRange.to)) return rows;
+const filterRowsByDate = (rows, from, to) => {
+  if (!from && !to) return rows;
+  // Check if ANY row in this dataset has a date column
+  const hasDateCol = rows.some(row => getRowDate(row) !== null);
+  // If no date column exists in data, return all rows unfiltered
+  if (!hasDateCol) return rows;
   return rows.filter(row => {
     const d = getRowDate(row);
-    if (!d) return true; // keep rows with no recognizable date rather than dropping them
+    // Row has no date — exclude it when a filter is active
+    if (!d) return false;
     const key = d.toISOString().slice(0, 10);
-    if (dateRange.from && key < dateRange.from) return false;
-    if (dateRange.to && key > dateRange.to) return false;
+    if (from && key < from) return false;
+    if (to   && key > to)   return false;
     return true;
   });
 };
@@ -127,8 +132,9 @@ const makeTopChartData = (rows, cols, limit = 8) => {
   rows.forEach(row => {
     const value = String(getFirstValue(row, cols, '')).trim();
     if (!value || value === '-') return;
-    const n = parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions','threats'], 1));
-    map.set(value, (map.get(value) || 0) + (n || 1));
+    const rawCount = getFirstValue(row, ['count','nrepeat','nsess','sessions','threats','nbytes','bytes'], null);
+    const n = rawCount !== null ? parseNumber(rawCount) : 1;
+    map.set(value, (map.get(value) || 0) + (n > 0 ? n : 1));
   });
   return Array.from(map.entries())
     .sort((a, b) => b[1] - a[1])
@@ -145,7 +151,7 @@ const makeRiskTrendData = (rows) => {
     if (!date || date === 'Invalid Date') return;
     const old = map.get(date) || { date, sessions: 0, traffic: 0 };
     old.sessions += parseNumber(getFirstValue(row, ['nsess','sessions','session','count'], 1));
-    old.traffic += parseNumber(getFirstValue(row, ['nbytes','bytes','byte'], 0));
+    old.traffic  += parseNumber(getFirstValue(row, ['nbytes','bytes','byte'], 0));
     map.set(date, old);
   });
   return Array.from(map.values()).sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -154,7 +160,7 @@ const makeRiskTrendData = (rows) => {
 const makeRiskDistribution = (rows) => {
   const map = new Map();
   rows.forEach(row => {
-    const risk = String(getFirstValue(row, ['risk','severity','name'], '-'));
+    const risk  = String(getFirstValue(row, ['risk','severity','name'], '-'));
     const count = parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions'], 1));
     if (!risk || risk === '-') return;
     map.set(risk, (map.get(risk) || 0) + (count || 1));
@@ -166,11 +172,11 @@ const makeRiskDistribution = (rows) => {
 
 const getSecurityScoreStatus = (score) => {
   if (score >= 90) return { label: 'Excellent', color: '#22c55e' };
-  if (score >= 70) return { label: 'Warning', color: '#f59e0b' };
+  if (score >= 70) return { label: 'Warning',   color: '#f59e0b' };
   return { label: 'Critical', color: '#ef4444' };
 };
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Reusable Components ───────────────────────────────────────────────────────
 
 function KpiCard({ title, value, subtitle, icon, color }) {
   return (
@@ -190,69 +196,42 @@ function KpiCard({ title, value, subtitle, icon, color }) {
   );
 }
 
-function DateFilterInput({ label, value, onChange }) {
+function DateFilter({ from, to, onFromChange, onToChange, onClear }) {
   return (
-    <div className="flex flex-col">
-      <label className="mb-1 text-xs font-semibold uppercase text-[var(--muted)]">{label}</label>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border px-3 py-2 text-sm font-medium bg-[var(--card-bg)] border-[var(--card-border)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]"
-      />
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <input type="date" value={from} max={to || undefined}
+        onChange={(e) => onFromChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      <span className="text-[10px] text-[var(--muted)]">→</span>
+      <input type="date" value={to} min={from || undefined}
+        onChange={(e) => onToChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      {(from || to) && (
+        <button onClick={onClear} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">✕</button>
+      )}
     </div>
   );
 }
 
-function ChartCard({ title, subtitle, children, dateRange, onDateChange }) {
+function useCardFilter(rows) {
+  const [from, setFrom] = useState('');
+  const [to, setTo]     = useState('');
+  const filtered = useMemo(() => filterRowsByDate(rows, from, to), [rows, from, to]);
+  const clear = () => { setFrom(''); setTo(''); };
+  return { from, to, setFrom, setTo, clear, filtered };
+}
+
+function ChartCard({ title, subtitle, controls, children }) {
   return (
     <div className="rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
-      <div className="mb-4">
-        <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
-        <p className="mb-3 text-sm text-[var(--muted)]">{subtitle}</p>
-
-        {/* Date Filter */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          <DateFilterInput
-            label="From"
-            value={dateRange.from}
-            onChange={(value) => onDateChange({ ...dateRange, from: value })}
-          />
-          <DateFilterInput
-            label="To"
-            value={dateRange.to}
-            onChange={(value) => onDateChange({ ...dateRange, to: value })}
-          />
+      <div className="mb-4 flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-base font-extrabold sm:text-lg text-[var(--foreground)]">{title}</h3>
+          {subtitle && <p className="text-sm text-[var(--muted)] mt-0.5">{subtitle}</p>}
         </div>
+        {controls && <div className="flex items-center gap-2">{controls}</div>}
       </div>
-
       {children}
-    </div>
-  );
-}
-
-function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
-  return (
-    <div className="mb-6 rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
-      <h3 className="mb-4 text-base font-extrabold text-[var(--foreground)]">Global Date Filter</h3>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <DateFilterInput
-          label="From"
-          value={globalDateRange.from}
-          onChange={(value) => onGlobalDateChange({ ...globalDateRange, from: value })}
-        />
-        <DateFilterInput
-          label="To"
-          value={globalDateRange.to}
-          onChange={(value) => onGlobalDateChange({ ...globalDateRange, to: value })}
-        />
-        <button
-          onClick={() => onGlobalDateChange({ from: '', to: '' })}
-          className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 bg-[#6366f1]"
-        >
-          Reset Filters
-        </button>
-      </div>
     </div>
   );
 }
@@ -260,19 +239,9 @@ function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PaloAltoPage() {
-  const [globalDateRange, setGlobalDateRange] = useState({ from: '', to: '' });
-  const [componentDateRanges, setComponentDateRanges] = useState({
-    riskTrend: { from: '', to: '' },
-    riskDistribution: { from: '', to: '' },
-    topAttacks: { from: '', to: '' },
-    topSources: { from: '', to: '' },
-    topDeniedDestinations: { from: '', to: '' },
-    topConnections: { from: '', to: '' },
-  });
-  
   const [allReports, setAllReports] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState('');
 
   const fetchAllReports = async () => {
     setLoading(true);
@@ -281,15 +250,13 @@ export default function PaloAltoPage() {
       const results = await Promise.allSettled(
         REPORTS_TO_FETCH.map(name =>
           api.get(`/firewall/reports/${name}`).then(r => {
-            const raw = r.data?.data ?? r.data;
+            const raw   = r.data?.data ?? r.data;
             const table = extractTable(raw);
             return { report: name, rows: table?.rows ?? [], columns: table?.columns ?? [] };
           })
         )
       );
-      setAllReports(results
-        .filter(r => r.status === 'fulfilled')
-        .map(r => r.value));
+      setAllReports(results.filter(r => r.status === 'fulfilled').map(r => r.value));
     } catch (e) {
       setError(e.message || 'Failed to fetch firewall reports');
     } finally {
@@ -297,100 +264,85 @@ export default function PaloAltoPage() {
     }
   };
 
-  useEffect(() => {
-    fetchAllReports();
-  }, []);
+  useEffect(() => { fetchAllReports(); }, []);
 
-  const handleGlobalDateChange = (newRange) => {
-    setGlobalDateRange(newRange);
-  };
+  // Raw rows per report (no global filter)
+  const riskRows        = useMemo(() => getRowsByReport(allReports, 'risk-trend'), [allReports]);
+  const attackSrcRows   = useMemo(() => getRowsByReport(allReports, 'top-attacker-sources'), [allReports]);
+  const attackDestRows  = useMemo(() => getRowsByReport(allReports, 'top-attacker-destinations'), [allReports]);
+  const deniedRows      = useMemo(() => [
+    ...getRowsByReport(allReports, 'top-denied-destinations'),
+    ...getRowsByReport(allReports, 'top-denied-sources'),
+    ...getRowsByReport(allReports, 'top-denied-applications'),
+  ], [allReports]);
+  const riskyUserRows   = useMemo(() => getRowsByReport(allReports, 'risky-users'), [allReports]);
+  const topAttackRows   = useMemo(() => getRowsByReport(allReports, 'top-attacks'), [allReports]);
+  const connectionRows  = useMemo(() => getRowsByReport(allReports, 'top-connections'), [allReports]);
+  const allRows         = useMemo(() => allReports.flatMap(r => r.rows), [allReports]);
 
-  const handleComponentDateChange = (componentName, newRange) => {
-    setComponentDateRanges(prev => ({
-      ...prev,
-      [componentName]: newRange
-    }));
-  };
+  // Single shared date filter for all KPI cards
+  const [kpiFrom, setKpiFrom] = useState('');
+  const [kpiTo,   setKpiTo]   = useState('');
 
-  // All report rows are already fetched in full — the backend has no
-  // date-range support, so filtering happens here against each row's own
-  // timestamp instead of re-querying the API.
-  const filteredReports = useMemo(
-    () => allReports.map(r => ({ ...r, rows: filterRowsByDate(r.rows, globalDateRange) })),
-    [allReports, globalDateRange]
-  );
+  const kpiRows = useMemo(() => filterRowsByDate(allRows, kpiFrom, kpiTo), [allRows, kpiFrom, kpiTo]);
+  const kpiRiskRows   = useMemo(() => filterRowsByDate(riskRows,    kpiFrom, kpiTo), [riskRows,    kpiFrom, kpiTo]);
+  const kpiDeniedRows = useMemo(() => filterRowsByDate(deniedRows,  kpiFrom, kpiTo), [deniedRows,  kpiFrom, kpiTo]);
+  const kpiDestRows   = useMemo(() => filterRowsByDate(attackDestRows, kpiFrom, kpiTo), [attackDestRows, kpiFrom, kpiTo]);
+  const kpiRiskyRows  = useMemo(() => filterRowsByDate(riskyUserRows,  kpiFrom, kpiTo), [riskyUserRows,  kpiFrom, kpiTo]);
 
-  const allRows = useMemo(
-    () => filteredReports.flatMap(r => r.rows),
-    [filteredReports]
-  );
+  // Per-card filters
+  const riskTrendFilter   = useCardFilter(riskRows);
+  const riskDistFilter    = useCardFilter(riskRows);
+  const topAttacksFilter  = useCardFilter(topAttackRows);
+  const topSourcesFilter  = useCardFilter(attackSrcRows);
+  const deniedFilter      = useCardFilter(deniedRows);
+  const connectionsFilter = useCardFilter(connectionRows);
 
-  const dashboard = useMemo(() => {
-    const riskRowsAll = getRowsByReport(filteredReports, 'risk-trend');
-    const riskTrendRows = filterRowsByDate(riskRowsAll, componentDateRanges.riskTrend);
-    const riskDistRows  = filterRowsByDate(riskRowsAll, componentDateRanges.riskDistribution);
-
-    const attackerSourceRowsAll = getRowsByReport(filteredReports, 'top-attacker-sources');
-    const attackerSourceRows = filterRowsByDate(attackerSourceRowsAll, componentDateRanges.topSources);
-
-    const attackerDestRows = getRowsByReport(filteredReports, 'top-attacker-destinations');
-
-    const deniedRowsAll = [
-      ...getRowsByReport(filteredReports, 'top-denied-destinations'),
-      ...getRowsByReport(filteredReports, 'top-denied-sources'),
-      ...getRowsByReport(filteredReports, 'top-denied-applications'),
-    ];
-    const deniedRows = filterRowsByDate(deniedRowsAll, componentDateRanges.topDeniedDestinations);
-
-    const riskyUserRows = getRowsByReport(filteredReports, 'risky-users');
-
-    const topAttackRowsAll = getRowsByReport(filteredReports, 'top-attacks');
-    const topAttackRows = filterRowsByDate(topAttackRowsAll, componentDateRanges.topAttacks);
-
-    const connectionRowsAll = getRowsByReport(filteredReports, 'top-connections');
-    const connectionRows = filterRowsByDate(connectionRowsAll, componentDateRanges.topConnections);
-
-    const totalSessions = getSumByColumn(allRows, ['nsess','sessions','session','count']);
-    const totalTraffic = getSumByColumn(allRows, ['nbytes','bytes','byte']);
-
-    const highRiskEvents = riskRowsAll.reduce((sum, row) => {
+  // KPI values — filtered by shared KPI date filter
+  const kpis = useMemo(() => {
+    const totalSessions  = getSumByColumn(kpiRows, ['nsess','sessions','session','count']);
+    const totalTraffic   = getSumByColumn(kpiRows, ['nbytes','bytes','byte']);
+    const highRiskEvents = kpiRiskRows.reduce((sum, row) => {
       const risk = parseNumber(getFirstValue(row, ['risk','name','severity'], 0));
-      if (risk >= 4) return sum + parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions'], 1));
-      return sum;
+      return risk >= 4 ? sum + parseNumber(getFirstValue(row, ['count','nrepeat','nsess','sessions'], 1)) : sum;
     }, 0);
-
-    const blockedConnections = deniedRows.length || allRows.filter(row => {
+    const blockedConnections = kpiDeniedRows.length || kpiRows.filter(row => {
       const action = String(getFirstValue(row, ['action','category','name'], '')).toLowerCase();
       return action.includes('block') || action.includes('deny') || action.includes('drop');
     }).length;
-
     const topDestination = makeTopChartData(
-      attackerDestRows.length ? attackerDestRows : allRows,
+      kpiDestRows.length ? kpiDestRows : kpiRows,
       ['dst','destination','destination_ip','name']
     )[0]?.name || '-';
+    const securityScore = Math.max(0, Math.min(100,
+      Math.round(100 - highRiskEvents * 0.05 - kpiRiskyRows.length * 2 - blockedConnections * 0.1)
+    ));
+    return { totalSessions, totalTraffic, highRiskEvents, topDestination, securityScore };
+  }, [kpiRows, kpiRiskRows, kpiDeniedRows, kpiDestRows, kpiRiskyRows]);
 
-    const criticalUsers = riskyUserRows.length;
-    const securityScore = Math.max(0, Math.min(100, Math.round(100 - highRiskEvents * 0.05 - criticalUsers * 2 - blockedConnections * 0.1)));
+  // Per-card chart data
+  const riskTrendData   = useMemo(() => makeRiskTrendData(riskTrendFilter.filtered), [riskTrendFilter.filtered]);
+  const riskDistData    = useMemo(() => makeRiskDistribution(riskDistFilter.filtered), [riskDistFilter.filtered]);
+  const isActive = (f) => !!(f.from || f.to);
+  const topAttacksData  = useMemo(() => makeTopChartData(isActive(topAttacksFilter) ? topAttacksFilter.filtered : topAttackRows, ['threatid','threat','name','category']), [topAttacksFilter.filtered, topAttacksFilter.from, topAttacksFilter.to, topAttackRows]);
+  const topSourcesData  = useMemo(() => makeTopChartData(isActive(topSourcesFilter) ? topSourcesFilter.filtered : attackSrcRows, ['src','source','source_ip','name']), [topSourcesFilter.filtered, topSourcesFilter.from, topSourcesFilter.to, attackSrcRows]);
+  const deniedDestData  = useMemo(() => {
+    const rows = isActive(deniedFilter) ? deniedFilter.filtered : deniedRows;
+    // Try all possible column names used across top-denied-destinations / sources / applications
+    const data = makeTopChartData(rows, ['dst','destination','destination_ip','app','application','name','category']);
+    // If still empty, render raw name column as-is
+    if (data.length === 0) {
+      return makeTopChartData(rows, Object.keys(rows[0] || {}));
+    }
+    return data;
+  }, [deniedFilter.filtered, deniedRows]);
+  const connectionsData = useMemo(() => makeTopChartData(isActive(connectionsFilter) ? connectionsFilter.filtered : connectionRows, ['name','src','source','dst','destination']), [connectionsFilter.filtered, connectionsFilter.from, connectionsFilter.to, connectionRows]);
 
-    return {
-      totalSessions,
-      totalTraffic,
-      highRiskEvents,
-      topDestination,
-      securityScore,
-      riskTrendData: makeRiskTrendData(riskTrendRows.length ? riskTrendRows : allRows),
-      riskDistribution: makeRiskDistribution(riskDistRows),
-      topAttacks: makeTopChartData(topAttackRows.length ? topAttackRows : allRows, ['threatid','threat','name','category']),
-      topSources: makeTopChartData(attackerSourceRows.length ? attackerSourceRows : allRows, ['src','source','source_ip','name']),
-      topDeniedDestinations: makeTopChartData(deniedRows.length ? deniedRows : allRows, ['dst','destination','destination_ip','name']),
-      topConnections: makeTopChartData(connectionRows.length ? connectionRows : allRows, ['name','src','source','dst','destination']),
-    };
-  }, [filteredReports, allRows, componentDateRanges]);
-
-  const scoreStatus = getSecurityScoreStatus(dashboard.securityScore);
+  const scoreStatus = getSecurityScoreStatus(kpis.securityScore);
 
   return (
     <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-[var(--background)]">
+
       {/* Header */}
       <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
@@ -408,12 +360,14 @@ export default function PaloAltoPage() {
         </button>
       </div>
 
+      {/* Loader */}
       {loading && (
         <div className="flex h-72 items-center justify-center">
           <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#3b82f6] border-t-transparent" />
         </div>
       )}
 
+      {/* Error */}
       {error && (
         <div className="mb-5 rounded-xl border p-4 text-sm font-medium bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400">
           {error} — configure credentials in <a href="/settings" className="underline">Settings</a>
@@ -422,57 +376,66 @@ export default function PaloAltoPage() {
 
       {!loading && (
         <>
-          {/* Global Date Filter */}
-          <GlobalDateFilter 
-            globalDateRange={globalDateRange} 
-            onGlobalDateChange={handleGlobalDateChange}
-          />
+          {/* KPI Date Filter */}
+          <div className="mb-4 flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wide">KPI Filter:</span>
+            <input type="date" value={kpiFrom} max={kpiTo || undefined}
+              onChange={(e) => setKpiFrom(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            <span className="text-[11px] text-[var(--muted)]">→</span>
+            <input type="date" value={kpiTo} min={kpiFrom || undefined}
+              onChange={(e) => setKpiTo(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+            {(kpiFrom || kpiTo) && (
+              <button onClick={() => { setKpiFrom(''); setKpiTo(''); }}
+                className="text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+            )}
+          </div>
 
           {/* KPI Cards */}
           <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
-            <KpiCard title="Total Sessions" value={formatNumber(dashboard.totalSessions)} subtitle="nsess / session count" icon="📊" color="#3b82f6" />
-            <KpiCard title="Total Traffic" value={formatBytes(dashboard.totalTraffic)} subtitle="nbytes total traffic" icon="🌐" color="#06b6d4" />
-            <KpiCard title="High Risk Events" value={formatNumber(dashboard.highRiskEvents)} subtitle="Risk 4 + Risk 5" icon="🔴" color="#ef4444" />
-            <KpiCard title="Top Destination" value={dashboard.topDestination} subtitle="" icon="🎯" color="#0f766e" />
-            <KpiCard title="Security Score" value={`${dashboard.securityScore}/100`} subtitle={scoreStatus.label} icon="✅" color={scoreStatus.color} />
+            <KpiCard title="Total Sessions"  value={formatNumber(kpis.totalSessions)}      subtitle="nsess / session count"   icon="📊" color="#3b82f6" />
+            <KpiCard title="Total Traffic"   value={formatBytes(kpis.totalTraffic)}         subtitle="nbytes total traffic"    icon="🌐" color="#06b6d4" />
+            <KpiCard title="High Risk Events" value={formatNumber(kpis.highRiskEvents)}     subtitle="Risk 4 + Risk 5"         icon="🔴" color="#ef4444" />
+            <KpiCard title="Top Destination" value={kpis.topDestination}                    subtitle=""                        icon="🎯" color="#0f766e" />
+            <KpiCard title="Security Score"  value={`${kpis.securityScore}/100`}            subtitle={scoreStatus.label}       icon="✅" color={scoreStatus.color} />
           </div>
 
           {/* Charts */}
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {/* Risk Trend Over Time */}
-            <ChartCard 
-              title="Risk Trend Over Time" 
+
+            {/* Risk Trend */}
+            <ChartCard
+              title="Risk Trend Over Time"
               subtitle="Bar = traffic bytes, Line = session count"
-              dateRange={componentDateRanges.riskTrend}
-              onDateChange={(newRange) => handleComponentDateChange('riskTrend', newRange)}
+              controls={<DateFilter from={riskTrendFilter.from} to={riskTrendFilter.to} onFromChange={riskTrendFilter.setFrom} onToChange={riskTrendFilter.setTo} onClear={riskTrendFilter.clear} />}
             >
               <div className="h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={dashboard.riskTrendData} margin={{ top: 10, right: 25, bottom: 55, left: 10 }}>
+                  <ComposedChart data={riskTrendData} margin={{ top: 10, right: 25, bottom: 55, left: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
                     <XAxis dataKey="date" angle={-35} textAnchor="end" height={75} tick={{ fontSize: 11 }} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 11 }} />
+                    <YAxis yAxisId="left"  tick={{ fontSize: 11 }} />
                     <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} tickFormatter={formatBytes} />
                     <Tooltip formatter={(v, name) => name === 'traffic' ? [formatBytes(v), 'Traffic'] : [formatNumber(parseNumber(v)), 'Sessions']} />
-                    <Bar yAxisId="right" dataKey="traffic" fill="#3b82f6" radius={[5, 5, 0, 0]} maxBarSize={42} />
-                    <Line yAxisId="left" type="monotone" dataKey="sessions" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
+                    <Bar  yAxisId="right" dataKey="traffic"  fill="#3b82f6" radius={[5,5,0,0]} maxBarSize={42} />
+                    <Line yAxisId="left"  type="monotone" dataKey="sessions" stroke="#60a5fa" strokeWidth={3} dot={{ r: 3 }} activeDot={{ r: 6 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </ChartCard>
 
             {/* Risk Distribution */}
-            <ChartCard 
-              title="Risk-wise Distribution" 
+            <ChartCard
+              title="Risk-wise Distribution"
               subtitle="Risk 1 to Risk 5 security distribution"
-              dateRange={componentDateRanges.riskDistribution}
-              onDateChange={(newRange) => handleComponentDateChange('riskDistribution', newRange)}
+              controls={<DateFilter from={riskDistFilter.from} to={riskDistFilter.to} onFromChange={riskDistFilter.setFrom} onToChange={riskDistFilter.setTo} onClear={riskDistFilter.clear} />}
             >
               <div className="h-[360px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={dashboard.riskDistribution} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }}>
-                      {dashboard.riskDistribution.map((entry, i) => (
+                    <Pie data={riskDistData} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }}>
+                      {riskDistData.map((entry, i) => (
                         <Cell key={i} fill={RISK_COLORS[String(entry.risk)] || COLORS[i % COLORS.length]} />
                       ))}
                     </Pie>
@@ -482,22 +445,21 @@ export default function PaloAltoPage() {
               </div>
             </ChartCard>
 
-            {/* Top Attacks      */}
-            <ChartCard 
-              title="Top Attacks" 
+            {/* Top Attacks */}
+            <ChartCard
+              title="Top Attacks"
               subtitle="Most repeated firewall threat / attack names"
-              dateRange={componentDateRanges.topAttacks}
-              onDateChange={(newRange) => handleComponentDateChange('topAttacks', newRange)}
+              controls={<DateFilter from={topAttacksFilter.from} to={topAttacksFilter.to} onFromChange={topAttacksFilter.setFrom} onToChange={topAttacksFilter.setTo} onClear={topAttacksFilter.clear} />}
             >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.topAttacks} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
+                  <BarChart data={topAttacksData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" radius={[0, 5, 5, 0]}>
-                      {dashboard.topAttacks.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    <Bar dataKey="value" radius={[0,5,5,0]}>
+                      {topAttacksData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -505,64 +467,62 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Sources */}
-            <ChartCard 
-              title="Top Sources" 
+            <ChartCard
+              title="Top Sources"
               subtitle="Highest source IP / source count"
-              dateRange={componentDateRanges.topSources}
-              onDateChange={(newRange) => handleComponentDateChange('topSources', newRange)}
+              controls={<DateFilter from={topSourcesFilter.from} to={topSourcesFilter.to} onFromChange={topSourcesFilter.setFrom} onToChange={topSourcesFilter.setTo} onClear={topSourcesFilter.clear} />}
             >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.topSources} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
+                  <BarChart data={topSourcesData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#3b82f6" radius={[0, 5, 5, 0]} />
+                    <Bar dataKey="value" fill="#3b82f6" radius={[0,5,5,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </ChartCard>
 
             {/* Top Denied Destinations */}
-            <ChartCard 
-              title="Top Denied Destinations" 
+            <ChartCard
+              title="Top Denied Destinations"
               subtitle="Denied destination systems"
-              dateRange={componentDateRanges.topDeniedDestinations}
-              onDateChange={(newRange) => handleComponentDateChange('topDeniedDestinations', newRange)}
+              controls={<DateFilter from={deniedFilter.from} to={deniedFilter.to} onFromChange={deniedFilter.setFrom} onToChange={deniedFilter.setTo} onClear={deniedFilter.clear} />}
             >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.topDeniedDestinations} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
+                  <BarChart data={deniedDestData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#ef4444" radius={[0, 5, 5, 0]} />
+                    <Bar dataKey="value" fill="#ef4444" radius={[0,5,5,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </ChartCard>
 
             {/* Top Connections */}
-            <ChartCard 
-              title="Top Connections" 
+            <ChartCard
+              title="Top Connections"
               subtitle="Most repeated firewall connections"
-              dateRange={componentDateRanges.topConnections}
-              onDateChange={(newRange) => handleComponentDateChange('topConnections', newRange)}
+              controls={<DateFilter from={connectionsFilter.from} to={connectionsFilter.to} onFromChange={connectionsFilter.setFrom} onToChange={connectionsFilter.setTo} onClear={connectionsFilter.clear} />}
             >
               <div className="h-[320px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={dashboard.topConnections} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
+                  <BarChart data={connectionsData} layout="vertical" margin={{ top: 10, right: 25, bottom: 10, left: 140 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
                     <XAxis type="number" tick={{ fontSize: 11 }} />
                     <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#10b981" radius={[0, 5, 5, 0]} />
+                    <Bar dataKey="value" fill="#10b981" radius={[0,5,5,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </ChartCard>
+
           </div>
         </>
       )}

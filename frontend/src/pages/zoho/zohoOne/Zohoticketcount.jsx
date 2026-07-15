@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import api from '../../../api';
+import { useMemo } from 'react';
 
 const getClosedDate = (t) => t.closedTime || t.closed_at || t.closedAt || t.closeTime || t.closedDate || '';
 
@@ -7,17 +6,7 @@ const isSameMonth = (date, ref) => date.getMonth() === ref.getMonth() && date.ge
 
 const getMonthName = (date) => date.toLocaleString('en-IN', { month: 'short' });
 
-export default function Zohoticketcount() {
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setLoading(true);
-    api.get('/zoho/tickets-db')
-      .then(r => setTickets(r.data.responseData || []))
-      .catch(() => setTickets([]))
-      .finally(() => setLoading(false));
-  }, []);
+export default function Zohoticketcount({ tickets = [], loading = false }) {
 
   const counts = useMemo(() => {
     let open = 0, wip = 0, onHold = 0, revertAwaited = 0, closed = 0;

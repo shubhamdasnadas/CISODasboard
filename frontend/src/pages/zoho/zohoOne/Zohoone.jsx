@@ -339,6 +339,231 @@ function TicketListCard({ tickets, loading }) {
   );
 }
 
+// ── TicketTrendWidget ─────────────────────────────────────────────────────────
+function TicketTrendWidget({ tickets, activeDay, setActiveDay, loading }) {
+  const trend = useMemo(() => {
+    const grouped = weekdays.map(day => ({ day, tickets: [] }));
+    tickets.forEach(t => {
+      const ca = getCreatedAt(t); const d = new Date(ca);
+      if (!ca || isNaN(d.getTime())) return;
+      const idx = (d.getDay() + 6) % 7;
+      grouped[idx].tickets.push(t);
+    });
+    return grouped;
+  }, [tickets]);
+  const activeTrendRow = trend.find(r => r.day === activeDay);
+  const maxCount = Math.max(...trend.map(r => r.tickets.length), 1);
+  return (
+    <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
+      <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Ticket Trend</h2></div>
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4 sm:p-6">
+        {activeTrendRow && activeTrendRow.tickets.length > 0 && (
+          <div className="mb-5 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3 text-[var(--foreground)] shadow-sm">
+            <p className="mb-2 text-sm font-semibold">{activeTrendRow.day} tickets ({activeTrendRow.tickets.length})</p>
+            <div className="max-h-72 overflow-auto">
+              <table className="w-full min-w-[900px] border-collapse text-xs">
+                <thead><tr className="bg-[var(--muted-bg)]">
+                  {['ticket_no', 'subject', 'createdTime', 'closedTime', 'resolve_time', 'assignee', 'status'].map(h => (
+                    <th key={h} className="border border-[var(--card-border)] px-2 py-2 text-left">{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>{activeTrendRow.tickets.map((t, i) => (
+                  <tr key={i}>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{getTicketNo(t)}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{t.subject || '-'}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{formatDateTime(getCreatedAt(t))}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{formatDateTime(getClosedAt(t))}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{formatResolutionTime(t)}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{getAssigneeName(t)}</td>
+                    <td className="border border-[var(--card-border)] px-2 py-2">{t.status || '-'}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        <div className="h-full w-full flex h-32 items-end gap-3 overflow-x-auto pb-2 sm:gap-5">
+          {trend.map((row, idx) => {
+            const count = row.tickets.length;
+            const height = Math.max((count / maxCount) * 100, count ? 10 : 3);
+            const isSel = activeDay === row.day;
+            return (
+              <div key={row.day} className="h-full w-full flex min-w-16 flex-1 flex-col items-center justify-end gap-2">
+                <button type="button" onClick={() => setActiveDay(prev => prev === row.day ? null : row.day)}
+                  className={`rounded px-1.5 py-0.5 text-sm font-bold transition-colors ${isSel ? 'bg-indigo-600 text-white' : count ? 'text-[var(--foreground)] hover:bg-[var(--card-bg)]' : 'text-[var(--foreground)]'}`}>
+                  {count}
+                </button>
+                <button type="button" aria-label={`${row.day}: ${count} tickets`}
+                  className="w-full min-w-12 rounded-t-md transition-all hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  style={{ height: `${height}%`, backgroundColor: barColors[idx] }}
+                  onClick={() => setActiveDay(prev => prev === row.day ? null : row.day)} />
+                <div className="text-xs font-semibold text-[var(--muted)]">{row.day}</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ── EngineerPerformanceWidget ──────────────────────────────────────────────────
+function EngineerPerformanceWidget({ tickets, loading }) {
+  const engPerf = useMemo(() => {
+    const grouped = {};
+    tickets.forEach(t => {
+      const eng = getAssigneeName(t);
+      if (eng === 'Unassigned') return;
+      if (!grouped[eng]) grouped[eng] = { engineer: eng, open: [], closed: [] };
+      isClosedTicket(t) ? grouped[eng].closed.push(t) : grouped[eng].open.push(t);
+    });
+    return Object.values(grouped).sort((a, b) => (b.closed.length - a.closed.length) || a.engineer.localeCompare(b.engineer));
+  }, [tickets]);
+  return (
+    <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
+      <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Engineer Performance</h2></div>
+      <div className="overflow-x-auto rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
+        <table className="w-full min-w-[360px] text-sm">
+          <thead><tr>
+            <th className="pb-3 text-left font-semibold text-[var(--foreground)]">Engineer</th>
+            <th className="pb-3 text-right font-semibold text-[var(--foreground)]">Open</th>
+            <th className="pb-3 text-right font-semibold text-[var(--foreground)]">Closed</th>
+          </tr></thead>
+          <tbody>
+            {engPerf.map(row => (
+              <tr key={row.engineer}>
+                <td className="py-1.5 pr-6 font-medium text-[var(--foreground)]">{row.engineer}</td>
+                <td className="py-1.5 text-right"><HoverCount title={`${row.engineer} open tickets`} count={row.open.length} tickets={row.open} /></td>
+                <td className="py-1.5 text-right"><HoverCount title={`${row.engineer} closed tickets`} count={row.closed.length} tickets={row.closed} /></td>
+              </tr>
+            ))}
+            {!engPerf.length && <tr><td colSpan={3} className="py-6 text-center text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+// ── ResolutionHeatmapWidget ────────────────────────────────────────────────────
+function ResolutionHeatmapWidget({ tickets, loading }) {
+  const agingMatrix = useMemo(() => {
+    const grouped = {};
+    tickets.forEach(t => {
+      const dept = getDeptName(t);
+      const bucket = getResolutionTimeBucket(t);
+      if (!bucket) return;
+      if (!grouped[dept]) { grouped[dept] = {}; agingBuckets.forEach(b => { grouped[dept][b] = []; }); }
+      grouped[dept][bucket].push(t);
+    });
+    return Object.entries(grouped).map(([dept, buckets]) => ({ department: dept, buckets }))
+      .sort((a, b) => {
+        const aT = agingBuckets.reduce((s, bucket) => s + a.buckets[bucket].length, 0);
+        const bT = agingBuckets.reduce((s, bucket) => s + b.buckets[bucket].length, 0);
+        return bT - aT || a.department.localeCompare(b.department);
+      });
+  }, [tickets]);
+  const maxAging = Math.max(...agingMatrix.flatMap(r => agingBuckets.map(b => r.buckets[b].length)), 1);
+  return (
+    <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-2 shadow-sm">
+      <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Department Based Resolution Time Heatmap</h2></div>
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-2">
+        {agingMatrix.length ? (
+          <div className="space-y-4">
+            <div className="hidden grid-cols-[minmax(120px,1.4fr)_repeat(5,minmax(72px,1fr))] gap-1 text-xs font-semibold text-[var(--muted)] md:grid">
+              <div>Department</div>
+              {agingBuckets.map(b => <div key={b} className="text-center">{b}</div>)}
+            </div>
+            {agingMatrix.map(row => (
+              <div key={row.department} className="grid gap-1 md:grid-cols-[minmax(120px,1.4fr)_repeat(5,minmax(72px,1fr))]">
+                <div className="flex items-center rounded-md bg-[var(--card-bg)] px-2 py-2 text-sm font-semibold text-[var(--foreground)]">{row.department}</div>
+                {agingBuckets.map(b => {
+                  const bt = row.buckets[b]; const cnt = bt.length;
+                  const intensity = cnt / maxAging;
+                  return (
+                    <div key={b} className="rounded-md border border-[var(--card-border)] px-3 py-2" style={{ backgroundColor: cnt ? `rgba(79, 70, 229, ${0.12 + intensity * 0.45})` : 'var(--card-bg)' }}>
+                      <div className="mb-1 flex items-center justify-between gap-2 md:hidden"><span className="text-xs font-semibold text-[var(--muted)]">{b}</span></div>
+                      <div className="flex items-center justify-between gap-2 md:justify-center">
+                        <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                        <HoverCount title={`${row.department} ${b} tickets`} count={cnt} tickets={bt} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-6 text-center text-sm text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// ── MonthlyVolumeWidget ────────────────────────────────────────────────────────
+function MonthlyVolumeWidget({ tickets, loading }) {
+  const monthMatrix = useMemo(() => {
+    const monthMap = new Map(); const deptMap = {};
+    tickets.forEach(t => {
+      const ca = getCreatedAt(t); const d = new Date(ca);
+      if (!ca || isNaN(d.getTime())) return;
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = d.toLocaleString('en-US', { month: 'short' });
+      const dept = getDeptName(t);
+      monthMap.set(key, label);
+      if (!deptMap[dept]) deptMap[dept] = {};
+      if (!deptMap[dept][key]) deptMap[dept][key] = [];
+      deptMap[dept][key].push(t);
+    });
+    const months = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-5).map(([key, label]) => ({ key, label }));
+    const rows = Object.entries(deptMap).map(([dept, mt]) => ({ department: dept, monthTickets: mt }))
+      .sort((a, b) => {
+        const aT = months.reduce((s, m) => s + (a.monthTickets[m.key]?.length || 0), 0);
+        const bT = months.reduce((s, m) => s + (b.monthTickets[m.key]?.length || 0), 0);
+        return bT - aT || a.department.localeCompare(b.department);
+      });
+    return { months, rows };
+  }, [tickets]);
+  const maxMonth = Math.max(...monthMatrix.rows.flatMap(r => monthMatrix.months.map(m => r.monthTickets[m.key]?.length || 0)), 1);
+  const gridStyle = { '--month-grid': `minmax(150px, 1.4fr) repeat(${Math.max(monthMatrix.months.length, 1)}, minmax(72px, 1fr))` };
+  return (
+    <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
+      <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Department Based Monthly Ticket Volume</h2></div>
+      <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
+        {monthMatrix.rows.length ? (
+          <div className="space-y-4">
+            <div className="hidden gap-2 text-xs font-semibold text-[var(--muted)] md:grid" style={{ gridTemplateColumns: 'var(--month-grid)', ...gridStyle }}>
+              <div>Department</div>
+              {monthMatrix.months.map(m => <div key={m.key} className="text-center">{m.label}</div>)}
+            </div>
+            {monthMatrix.rows.map(row => (
+              <div key={row.department} className="grid gap-2" style={{ gridTemplateColumns: 'var(--month-grid)', ...gridStyle }}>
+                <div className="flex items-center rounded-md bg-[var(--card-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]">{row.department}</div>
+                {monthMatrix.months.map(m => {
+                  const mt = row.monthTickets[m.key] || []; const cnt = mt.length;
+                  const intensity = cnt / maxMonth;
+                  return (
+                    <div key={m.key} className="rounded-md border border-[var(--card-border)] px-3 py-2" style={{ backgroundColor: cnt ? `rgba(8, 145, 178, ${0.12 + intensity * 0.45})` : 'var(--card-bg)' }}>
+                      <div className="mb-1 flex items-center justify-between gap-2 md:hidden"><span className="text-xs font-semibold text-[var(--muted)]">{m.label}</span></div>
+                      <div className="flex items-center justify-between gap-2 md:justify-center">
+                        <span className="h-2 w-2 rounded-full bg-cyan-600" />
+                        <HoverCount title={`${row.department} ${m.label} tickets`} count={cnt} tickets={mt} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-6 text-center text-sm text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Zohoone() {
   const [tickets, setTickets] = useState([]);
@@ -423,74 +648,7 @@ export default function Zohoone() {
     getDeptName(t).toLowerCase().includes(search.toLowerCase())
   ), [tickets, search]);
 
-  const ticketTrend = useMemo(() => {
-    const grouped = weekdays.map(day => ({ day, tickets: [] }));
-    tickets.forEach(t => {
-      const ca = getCreatedAt(t); const d = new Date(ca);
-      if (!ca || isNaN(d.getTime())) return;
-      const idx = (d.getDay() + 6) % 7;
-      grouped[idx].tickets.push(t);
-    });
-    return grouped;
-  }, [tickets]);
 
-  const engineerPerformance = useMemo(() => {
-    const grouped = {};
-    tickets.forEach(t => {
-      const eng = getAssigneeName(t);
-      if (eng === 'Unassigned') return;
-      if (!grouped[eng]) grouped[eng] = { engineer: eng, open: [], closed: [] };
-      isClosedTicket(t) ? grouped[eng].closed.push(t) : grouped[eng].open.push(t);
-    });
-    return Object.values(grouped).sort((a, b) => (b.closed.length - a.closed.length) || a.engineer.localeCompare(b.engineer));
-  }, [tickets]);
-
-  const activeTrend = ticketTrend.find(r => r.day === activeDay);
-  const maxTicketCount = Math.max(...ticketTrend.map(r => r.tickets.length), 1);
-
-  const departmentAgingMatrix = useMemo(() => {
-    const grouped = {};
-    tickets.forEach(t => {
-      const dept = getDeptName(t);
-      const bucket = getResolutionTimeBucket(t);
-      if (!bucket) return;
-      if (!grouped[dept]) { grouped[dept] = {}; agingBuckets.forEach(b => { grouped[dept][b] = []; }); }
-      grouped[dept][bucket].push(t);
-    });
-    return Object.entries(grouped).map(([dept, buckets]) => ({ department: dept, buckets }))
-      .sort((a, b) => {
-        const aT = agingBuckets.reduce((s, bucket) => s + a.buckets[bucket].length, 0);
-        const bT = agingBuckets.reduce((s, bucket) => s + b.buckets[bucket].length, 0);
-        return bT - aT || a.department.localeCompare(b.department);
-      });
-  }, [tickets]);
-
-  const monthDepartmentMatrix = useMemo(() => {
-    const monthMap = new Map(); const deptMap = {};
-    tickets.forEach(t => {
-      const ca = getCreatedAt(t); const d = new Date(ca);
-      if (!ca || isNaN(d.getTime())) return;
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = d.toLocaleString('en-US', { month: 'short' });
-      const dept = getDeptName(t);
-      monthMap.set(key, label);
-      if (!deptMap[dept]) deptMap[dept] = {};
-      if (!deptMap[dept][key]) deptMap[dept][key] = [];
-      deptMap[dept][key].push(t);
-    });
-    const months = Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).slice(-5).map(([key, label]) => ({ key, label }));
-    const rows = Object.entries(deptMap).map(([dept, mt]) => ({ department: dept, monthTickets: mt }))
-      .sort((a, b) => {
-        const aT = months.reduce((s, m) => s + (a.monthTickets[m.key]?.length || 0), 0);
-        const bT = months.reduce((s, m) => s + (b.monthTickets[m.key]?.length || 0), 0);
-        return bT - aT || a.department.localeCompare(b.department);
-      });
-    return { months, rows };
-  }, [tickets]);
-
-  const maxAgingCount = Math.max(...departmentAgingMatrix.flatMap(r => agingBuckets.map(b => r.buckets[b].length)), 1);
-  const maxMonthCount = Math.max(...monthDepartmentMatrix.rows.flatMap(r => monthDepartmentMatrix.months.map(m => r.monthTickets[m.key]?.length || 0)), 1);
-  const monthGridStyle = { '--month-grid': `minmax(150px, 1.4fr) repeat(${Math.max(monthDepartmentMatrix.months.length, 1)}, minmax(72px, 1fr))` };
 
   return (
     <div className="space-y-6 p-4 sm:p-6">
@@ -642,151 +800,10 @@ export default function Zohoone() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        {/* Ticket Trend */}
-        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
-          <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Ticket Trend</h2></div>
-          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4 sm:p-6">
-            {activeTrend && activeTrend.tickets.length > 0 && (
-              <div className="mb-5 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-3 text-[var(--foreground)] shadow-sm">
-                <p className="mb-2 text-sm font-semibold">{activeTrend.day} tickets ({activeTrend.tickets.length})</p>
-                <div className="max-h-72 overflow-auto">
-                  <table className="w-full min-w-[900px] border-collapse text-xs">
-                    <thead><tr className="bg-[var(--muted-bg)]">
-                      {['ticket_no', 'subject', 'createdTime', 'closedTime', 'resolve_time', 'assignee', 'status'].map(h => (
-                        <th key={h} className="border border-[var(--card-border)] px-2 py-2 text-left">{h}</th>
-                      ))}
-                    </tr></thead>
-                    <tbody>{activeTrend.tickets.map((t, i) => (
-                      <tr key={i}>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{getTicketNo(t)}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{t.subject || '-'}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{formatDateTime(getCreatedAt(t))}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{formatDateTime(getClosedAt(t))}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{formatResolutionTime(t)}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{getAssigneeName(t)}</td>
-                        <td className="border border-[var(--card-border)] px-2 py-2">{t.status || '-'}</td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            <div className="h-full w-full flex h-32 items-end gap-3 overflow-x-auto pb-2 sm:gap-5">
-              {ticketTrend.map((row, idx) => {
-                const count = row.tickets.length;
-                const height = Math.max((count / maxTicketCount) * 100, count ? 10 : 3);
-                const isSel = activeDay === row.day;
-                return (
-                  <div key={row.day} className="h-full w-full flex min-w-16 flex-1 flex-col items-center justify-end gap-2">
-                    <button type="button" onClick={() => setActiveDay(prev => prev === row.day ? null : row.day)}
-                      className={`rounded px-1.5 py-0.5 text-sm font-bold transition-colors ${isSel ? 'bg-indigo-600 text-white' : count ? 'text-[var(--foreground)] hover:bg-[var(--card-bg)]' : 'text-[var(--foreground)]'}`}>
-                      {count}
-                    </button>
-                    <button type="button" aria-label={`${row.day}: ${count} tickets`}
-                      className="w-full min-w-12 rounded-t-md transition-all hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      style={{ height: `${height}%`, backgroundColor: barColors[idx] }}
-                      onClick={() => setActiveDay(prev => prev === row.day ? null : row.day)} />
-                    <div className="text-xs font-semibold text-[var(--muted)]">{row.day}</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* Engineer Performance */}
-        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
-          <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Engineer Performance</h2></div>
-          <div className="overflow-x-auto rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
-            <table className="w-full min-w-[360px] text-sm">
-              <thead><tr>
-                <th className="pb-3 text-left font-semibold text-[var(--foreground)]">Engineer</th>
-                <th className="pb-3 text-right font-semibold text-[var(--foreground)]">Open</th>
-                <th className="pb-3 text-right font-semibold text-[var(--foreground)]">Closed</th>
-              </tr></thead>
-              <tbody>
-                {engineerPerformance.map(row => (
-                  <tr key={row.engineer}>
-                    <td className="py-1.5 pr-6 font-medium text-[var(--foreground)]">{row.engineer}</td>
-                    <td className="py-1.5 text-right"><HoverCount title={`${row.engineer} open tickets`} count={row.open.length} tickets={row.open} /></td>
-                    <td className="py-1.5 text-right"><HoverCount title={`${row.engineer} closed tickets`} count={row.closed.length} tickets={row.closed} /></td>
-                  </tr>
-                ))}
-                {!engineerPerformance.length && <tr><td colSpan={3} className="py-6 text-center text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Resolution Time Heatmap */}
-        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-2 shadow-sm">
-          <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Department Based Resolution Time Heatmap</h2></div>
-          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-2">
-            {departmentAgingMatrix.length ? (
-              <div className="space-y-4">
-                <div className="hidden grid-cols-[minmax(120px,1.4fr)_repeat(5,minmax(72px,1fr))] gap-1 text-xs font-semibold text-[var(--muted)] md:grid">
-                  <div>Department</div>
-                  {agingBuckets.map(b => <div key={b} className="text-center">{b}</div>)}
-                </div>
-                {departmentAgingMatrix.map(row => (
-                  <div key={row.department} className="grid gap-1 md:grid-cols-[minmax(120px,1.4fr)_repeat(5,minmax(72px,1fr))]">
-                    <div className="flex items-center rounded-md bg-[var(--card-bg)] px-2 py-2 text-sm font-semibold text-[var(--foreground)]">{row.department}</div>
-                    {agingBuckets.map(b => {
-                      const bt = row.buckets[b]; const cnt = bt.length;
-                      const intensity = cnt / maxAgingCount;
-                      return (
-                        <div key={b} className="rounded-md border border-[var(--card-border)] px-3 py-2" style={{ backgroundColor: cnt ? `rgba(79, 70, 229, ${0.12 + intensity * 0.45})` : 'var(--card-bg)' }}>
-                          <div className="mb-1 flex items-center justify-between gap-2 md:hidden"><span className="text-xs font-semibold text-[var(--muted)]">{b}</span></div>
-                          <div className="flex items-center justify-between gap-2 md:justify-center">
-                            <span className="h-2 w-2 rounded-full bg-indigo-500" />
-                            <HoverCount title={`${row.department} ${b} tickets`} count={cnt} tickets={bt} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-sm text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</div>
-            )}
-          </div>
-        </section>
-
-        {/* Monthly Volume */}
-        <section className="rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] p-5 shadow-sm">
-          <div className="mb-5"><h2 className="text-xl font-bold text-[var(--foreground)]">Department Based Monthly Ticket Volume</h2></div>
-          <div className="rounded-lg border border-[var(--card-border)] bg-[var(--muted-bg)] p-4">
-            {monthDepartmentMatrix.rows.length ? (
-              <div className="space-y-4">
-                <div className="hidden gap-2 text-xs font-semibold text-[var(--muted)] md:grid" style={{ gridTemplateColumns: 'var(--month-grid)', ...monthGridStyle }}>
-                  <div>Department</div>
-                  {monthDepartmentMatrix.months.map(m => <div key={m.key} className="text-center">{m.label}</div>)}
-                </div>
-                {monthDepartmentMatrix.rows.map(row => (
-                  <div key={row.department} className="grid gap-2" style={{ gridTemplateColumns: 'var(--month-grid)', ...monthGridStyle }}>
-                    <div className="flex items-center rounded-md bg-[var(--card-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]">{row.department}</div>
-                    {monthDepartmentMatrix.months.map(m => {
-                      const mt = row.monthTickets[m.key] || []; const cnt = mt.length;
-                      const intensity = cnt / maxMonthCount;
-                      return (
-                        <div key={m.key} className="rounded-md border border-[var(--card-border)] px-3 py-2" style={{ backgroundColor: cnt ? `rgba(8, 145, 178, ${0.12 + intensity * 0.45})` : 'var(--card-bg)' }}>
-                          <div className="mb-1 flex items-center justify-between gap-2 md:hidden"><span className="text-xs font-semibold text-[var(--muted)]">{m.label}</span></div>
-                          <div className="flex items-center justify-between gap-2 md:justify-center">
-                            <span className="h-2 w-2 rounded-full bg-cyan-600" />
-                            <HoverCount title={`${row.department} ${m.label} tickets`} count={cnt} tickets={mt} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-6 text-center text-sm text-[var(--muted)]">{loading ? 'Loading...' : 'No tickets found'}</div>
-            )}
-          </div>
-        </section>
+        <WidgetDateFilter tickets={tickets}>{filtered => <TicketTrendWidget tickets={filtered} activeDay={activeDay} setActiveDay={setActiveDay} loading={loading} />}</WidgetDateFilter>
+        <WidgetDateFilter tickets={tickets}>{filtered => <EngineerPerformanceWidget tickets={filtered} loading={loading} />}</WidgetDateFilter>
+        <WidgetDateFilter tickets={tickets}>{filtered => <ResolutionHeatmapWidget tickets={filtered} loading={loading} />}</WidgetDateFilter>
+        <WidgetDateFilter tickets={tickets}>{filtered => <MonthlyVolumeWidget tickets={filtered} loading={loading} />}</WidgetDateFilter>
       </div>
 
       <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">

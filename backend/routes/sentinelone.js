@@ -61,7 +61,21 @@ router.post('/sync', async (req, res) => {
 // GET /api/sentinelone/db/threats
 router.get('/db/threats', async (req, res) => {
   try {
-    const { rows } = await req.orgPool.query('SELECT data FROM s1_threats ORDER BY synced_at DESC');
+    const { from, to } = req.query;
+    let query = 'SELECT data FROM s1_threats';
+    const params = [];
+    const conditions = [];
+    if (from) {
+      params.push(from);
+      conditions.push(`(data->'threatInfo'->>'createdAt')::date >= $${params.length}::date`);
+    }
+    if (to) {
+      params.push(to);
+      conditions.push(`(data->'threatInfo'->>'createdAt')::date <= $${params.length}::date`);
+    }
+    if (conditions.length) query += ' WHERE ' + conditions.join(' AND ');
+    query += ' ORDER BY synced_at DESC';
+    const { rows } = await req.orgPool.query(query, params);
     res.json({ threats: rows.map(r => r.data) });
   } catch (err) {
     res.status(500).json({ message: err.message });

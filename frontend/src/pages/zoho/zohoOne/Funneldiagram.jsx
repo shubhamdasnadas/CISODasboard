@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import api from '../../../api';
+import { useMemo, useState } from 'react';
 
 const FUNNEL_STATUSES = [
   'Open', 'Re-Open', 'Acknowledge', 'WIP', 'On Hold', 'On Hold by Customer',
@@ -47,18 +46,8 @@ function slicePath(y1, y2) {
   return `M ${lx1} ${y1} L ${rx1} ${y1} L ${rx2} ${y2} L ${lx2} ${y2} Z`;
 }
 
-export default function Funneldiagram() {
-  const [tickets, setTickets]   = useState([]);
-  const [loading, setLoading]   = useState(false);
+export default function Funneldiagram({ tickets = [], loading = false }) {
   const [tooltip, setTooltip]   = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    api.get('/zoho/tickets-db')
-      .then(r => setTickets(r.data.responseData || []))
-      .catch(() => setTickets([]))
-      .finally(() => setLoading(false));
-  }, []);
 
   const statusCounts = useMemo(() => {
     const counts = {};
