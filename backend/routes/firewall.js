@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { syncFirewall, REPORTS } = require('../services/firewall');
+const { filterReportDataByDateRange, isValidDateParam } = require('../utils/dateFilter');
 
 // GET /api/firewall/credentials
 router.get('/credentials', async (req, res) => {
@@ -54,16 +55,39 @@ router.post('/collect', async (req, res) => {
   }
 });
 
-// GET /api/firewall/reports/:reportName
+// GET /api/firewall/reports/:reportName?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 router.get('/reports/:reportName', async (req, res) => {
   try {
     const { reportName } = req.params;
+    const { startDate, endDate } = req.query;
+
+    // Validate date params if provided
+    if (startDate && !isValidDateParam(startDate)) {
+      return res.status(400).json({ message: 'Invalid startDate format. Expected YYYY-MM-DD' });
+    }
+    if (endDate && !isValidDateParam(endDate)) {
+      return res.status(400).json({ message: 'Invalid endDate format. Expected YYYY-MM-DD' });
+    }
+    if (startDate && endDate && new Date(startDate) > new Date(endDate)) {
+      return res.status(400).json({ message: 'startDate must be before endDate' });
+    }
+
     const { rows } = await req.orgPool.query(
       'SELECT data, updated_at FROM firewall_reports WHERE report_name = $1 LIMIT 1',
       [reportName]
     );
     if (!rows[0]) return res.json({ data: null, updatedAt: null });
-    res.json({ data: rows[0].data, updatedAt: rows[0].updated_at });
+
+    let { data } = rows[0];
+
+    // Filter the cached report entries down to the requested date range.
+    // Filtering happens here (post-fetch) since reports are synced/cached
+    // as full JSON blobs rather than queried live per date range.
+    if (startDate || endDate) {
+      data = filterReportDataByDateRange(data, startDate, endDate);
+    }
+
+    res.json({ data, updatedAt: rows[0].updated_at });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

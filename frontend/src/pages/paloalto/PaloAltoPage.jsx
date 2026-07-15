@@ -236,9 +236,45 @@ function ChartCard({ title, subtitle, controls, children }) {
   );
 }
 
+function GlobalDateFilter({ globalDateRange, onGlobalDateChange }) {
+  return (
+    <div className="mb-6 rounded-2xl border p-4 sm:p-5 bg-[var(--card-bg)] border-[var(--card-border)]">
+      <h3 className="mb-4 text-base font-extrabold text-[var(--foreground)]">Global Date Filter</h3>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <DateFilterInput
+          label="From"
+          value={globalDateRange.from}
+          onChange={(value) => onGlobalDateChange({ ...globalDateRange, from: value })}
+        />
+        <DateFilterInput
+          label="To"
+          value={globalDateRange.to}
+          onChange={(value) => onGlobalDateChange({ ...globalDateRange, to: value })}
+        />
+        <button
+          onClick={() => onGlobalDateChange({ from: '', to: '' })}
+          className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90 bg-[#6366f1]"
+        >
+          Reset Filters
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PaloAltoPage() {
+  const [globalDateRange, setGlobalDateRange] = useState({ from: '', to: '' });
+  const [componentDateRanges, setComponentDateRanges] = useState({
+    riskTrend: { from: '', to: '' },
+    riskDistribution: { from: '', to: '' },
+    topAttacks: { from: '', to: '' },
+    topSources: { from: '', to: '' },
+    topDeniedDestinations: { from: '', to: '' },
+    topConnections: { from: '', to: '' },
+  });
+  
   const [allReports, setAllReports] = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -247,6 +283,9 @@ export default function PaloAltoPage() {
     setLoading(true);
     setError('');
     try {
+      const params = buildQueryParams(globalDateRange);
+      const queryString = params ? `?${params}` : '';
+      
       const results = await Promise.allSettled(
         REPORTS_TO_FETCH.map(name =>
           api.get(`/firewall/reports/${name}`).then(r => {
