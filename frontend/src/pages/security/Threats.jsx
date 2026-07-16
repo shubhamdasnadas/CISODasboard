@@ -512,22 +512,7 @@ export default function Threats() {
           }
         </ChartCard>
 
-        <ChartCard title="MITRE ATT&CK Techniques" subtitle="Top techniques observed" height={300}
-          controls={<DateFilter from={mitreFilter.from} to={mitreFilter.to} onFromChange={mitreFilter.setFrom} onToChange={mitreFilter.setTo} onClear={mitreFilter.clear} />}>
-          {mitreData.length === 0
-            ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No MITRE data</p></div>
-            : <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={mitreData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={130} />
-                  <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#8b5cf6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Count" cursor="pointer"
-                    onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'mitreTechnique', value: data.fullName, title: `Threats using ${data.fullName}` } })} />
-                </BarChart>
-              </ResponsiveContainer>
-          }
-        </ChartCard>
+        
       </div>
 
       {/* MITRE ATT&CK Matrix */}
@@ -619,7 +604,7 @@ export default function Threats() {
       </div>
 
       {/* MTTD + MTTM trends */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <ChartCard title="MTTD Trend" subtitle="Mean time to detect (minutes)" height={240}
           controls={<DateFilter from={mttdFilter.from} to={mttdFilter.to} onFromChange={mttdFilter.setFrom} onToChange={mttdFilter.setTo} onClear={mttdFilter.clear} />}>
           {mttdTrend.length === 0
@@ -651,7 +636,7 @@ export default function Threats() {
               </ResponsiveContainer>
           }
         </ChartCard>
-      </div>
+      </div> */}
 
       {/* By Site + By Group */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -24,6 +24,7 @@ function parseDate(v) {
 }
 
 function mapEvent(e) {
+  const ad = e.additional_data || {};
   return {
     eventId: e.event_id,
     type: e.type,
@@ -32,6 +33,7 @@ function mapEvent(e) {
     confidenceIndicator: e.confidence_indicator,
     description: e.description,
     senderAddress: e.sender_address,
+    receiverAddress: ad.receiver_address || ad.recipient_address || ad.receiverAddress || ad.recipientAddress || ad.to || null,
     saas: e.saas,
     entityId: e.entity_id,
     entityLink: e.entity_link,
@@ -518,6 +520,7 @@ export default function CheckpointPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--muted)]">{ev.severity || '—'}</td>
                     <td className="px-4 py-3 text-xs text-[var(--foreground)] max-w-xs truncate">{ev.senderAddress || '—'}</td>
+                    {/* <td className="px-4 py-3 text-xs text-[var(--foreground)] max-w-xs truncate">{ev.receiverAddress || '—'}</td> */}
                     <td className="px-4 py-3 text-xs text-[var(--muted)] max-w-xs truncate">{ev.description || '—'}</td>
                     <td className="px-4 py-3 text-xs text-[var(--muted)]">{ev.eventCreated ? new Date(ev.eventCreated).toLocaleDateString() : '—'}</td>
                   </tr>

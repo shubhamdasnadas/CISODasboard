@@ -40,11 +40,22 @@ function EmptyState() {
 // Widget 1: Severity Distribution
 const SEV_COLORS = ['#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'];
 
+// Standard CVSS-style qualitative severity scale (0-4)
+const SEV_LABELS = {
+  0: 'Informational',
+  1: 'Low',
+  2: 'Medium',
+  3: 'High',
+  4: 'Critical',
+};
+
 function SeverityDonut({ events }) {
   const { data, total } = useMemo(() => {
     const counts = {};
     events.forEach(e => { const s = e.severity ?? '?'; counts[s] = (counts[s] || 0) + 1; });
-    const data = Object.entries(counts).sort(([a],[b]) => Number(a)-Number(b)).map(([sev,value]) => ({ name: `Sev ${sev}`, value }));
+    const data = Object.entries(counts)
+      .sort(([a],[b]) => Number(a)-Number(b))
+      .map(([sev,value]) => ({ name: SEV_LABELS[sev] ?? `Sev ${sev}`, value }));
     return { data, total: data.reduce((s,d) => s+d.value, 0) };
   }, [events]);
   if (total === 0) return <WidgetCard title="Severity Distribution"><EmptyState /></WidgetCard>;
@@ -222,7 +233,7 @@ function CumulativeTimeline({ events }) {
   if (data.length === 0) return <WidgetCard title="Cumulative Events Over Time"><EmptyState /></WidgetCard>;
   return (
     <WidgetCard title="Cumulative Events Over Time">
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={350}>
         <LineChart data={data} margin={{ top:4, right:8, left:-16, bottom:0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -309,36 +320,36 @@ function SaasPlatformChart({ events }) {
   }, [events]);
   if (data.length === 0) return <WidgetCard title="SaaS Platform Distribution"><EmptyState /></WidgetCard>;
   const total = data.reduce((s,d) => s+d.count, 0);
-  if (data.length <= 6) {
-    return (
-      <WidgetCard title="SaaS Platform Distribution">
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
-              {data.map((_,i) => <Cell key={i} fill={SAAS_COLORS[i % SAAS_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
-            <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </WidgetCard>
-    );
-  }
-  return (
-    <WidgetCard title="SaaS Platform Distribution">
-      <ResponsiveContainer width="100%" height={Math.max(200, data.length*32+40)}>
-        <BarChart data={data} layout="vertical" margin={{ top:4, right:48, left:8, bottom:4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={100} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]}>
-            <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </WidgetCard>
-  );
+  // if (data.length <= 6) {
+  //   return (
+  //     <WidgetCard title="SaaS Platform Distribution">
+  //       <ResponsiveContainer width="100%" height={220}>
+  //         <PieChart>
+  //           <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
+  //             {data.map((_,i) => <Cell key={i} fill={SAAS_COLORS[i % SAAS_COLORS.length]} />)}
+  //           </Pie>
+  //           <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
+  //           <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+  //         </PieChart>
+  //       </ResponsiveContainer>
+  //     </WidgetCard>
+  //   );
+  // }
+  // return (
+  //   <WidgetCard title="SaaS Platform Distribution">
+  //     <ResponsiveContainer width="100%" height={Math.max(200, data.length*32+40)}>
+  //       <BarChart data={data} layout="vertical" margin={{ top:4, right:48, left:8, bottom:4 }}>
+  //         <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" horizontal={false} />
+  //         <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+  //         <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={100} />
+  //         <Tooltip contentStyle={TOOLTIP_STYLE} />
+  //         <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]}>
+  //           <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
+  //         </Bar>
+  //       </BarChart>
+  //     </ResponsiveContainer>
+  //   </WidgetCard>
+  // );
 }
 
 // Widget 12: Remediation Rate Over Time
