@@ -39,7 +39,6 @@ export default function Settings() {
   const parseSyncResults = (data) => {
     const results = data?.results || [];
     const byKey = data || {};
-
     const extract = (keys, fallbackMsg) => {
       // Try array of results first
       for (const key of keys) {
@@ -56,7 +55,6 @@ export default function Settings() {
       }
       return null;
     };
-
     return {
       s1: extract(['sentinelone', 's1', 'sentinel'], 'Synced'),
       firewall: extract(['firewall', 'paloalto', 'palo'], 'Synced'),
@@ -107,6 +105,35 @@ export default function Settings() {
   const handleSetProvider = (category, providerName) => {
     setSelectedProvider(category, providerName);
   };
+
+  // Render a provider card
+  const renderProviderCard = (provider, category) => (
+    <div key={provider.name} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 transition-colors">
+      <div className="flex items-center gap-3">
+        <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
+          <span className="text-sm">{provider.icon}</span>
+        </div>
+        <div className="flex-1">
+          <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+          <p className="text-xs text-[var(--muted)]">Click to configure</p>
+        </div>
+      </div>
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => navigate(provider.path)}
+          className="flex-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium"
+        >
+          Configure
+        </button>
+        <button
+          onClick={() => handleSetProvider(category, provider.name)}
+          className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium"
+        >
+          Set as Active
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl">
@@ -163,7 +190,6 @@ export default function Settings() {
                 ) : 'Sync All Now'}
               </button>
             </div>
-
             {/* Per-service results breakdown */}
             {syncResults && (
               <div className="border border-[var(--card-border)] rounded-xl overflow-hidden">
@@ -208,9 +234,7 @@ export default function Settings() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--foreground)]">
-                  {selectedProviders.edr || 'EDR (Endpoint Detection & Response)'}
-                </h3>
+                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.edr || 'EDR (Endpoint Detection & Response)'}</h3>
                 <p className="text-xs text-[var(--muted)] mt-0.5">Configure endpoint protection integration</p>
               </div>
             </div>
@@ -222,26 +246,7 @@ export default function Settings() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.edr.map((provider) => (
-                <div
-                  key={provider.name}
-                  onClick={() => navigate(provider.path)}
-                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
-                      <span className="text-sm">{provider.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
-                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
-                    </div>
-                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
+              {providers.edr.map((provider) => renderProviderCard(provider, 'edr'))}
             </div>
           </div>
         </div>
@@ -256,9 +261,7 @@ export default function Settings() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--foreground)]">
-                  {selectedProviders.emailSecurity || 'Email Security'}
-                </h3>
+                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.emailSecurity || 'Email Security'}</h3>
                 <p className="text-xs text-[var(--muted)] mt-0.5">Configure email protection integration</p>
               </div>
             </div>
@@ -270,26 +273,7 @@ export default function Settings() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.emailSecurity.map((provider) => (
-                <div
-                  key={provider.name}
-                  onClick={() => navigate(provider.path)}
-                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
-                      <span className="text-sm">{provider.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
-                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
-                    </div>
-                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
+              {providers.emailSecurity.map((provider) => renderProviderCard(provider, 'emailSecurity'))}
             </div>
           </div>
         </div>
@@ -304,9 +288,7 @@ export default function Settings() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--foreground)]">
-                  {selectedProviders.firewall || 'Firewall'}
-                </h3>
+                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.firewall || 'Firewall'}</h3>
                 <p className="text-xs text-[var(--muted)] mt-0.5">Configure network firewall integration</p>
               </div>
             </div>
@@ -318,26 +300,7 @@ export default function Settings() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.firewall.map((provider) => (
-                <div
-                  key={provider.name}
-                  onClick={() => navigate(provider.path)}
-                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
-                      <span className="text-sm">{provider.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
-                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
-                    </div>
-                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
+              {providers.firewall.map((provider) => renderProviderCard(provider, 'firewall'))}
             </div>
           </div>
         </div>
@@ -352,9 +315,7 @@ export default function Settings() {
                 </svg>
               </div>
               <div>
-                <h3 className="font-semibold text-[var(--foreground)]">
-                  {selectedProviders.ticketing || 'Ticketing'}
-                </h3>
+                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.ticketing || 'Ticketing'}</h3>
                 <p className="text-xs text-[var(--muted)] mt-0.5">Configure support ticketing integration</p>
               </div>
             </div>
@@ -366,26 +327,7 @@ export default function Settings() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.ticketing.map((provider) => (
-                <div
-                  key={provider.name}
-                  onClick={() => navigate(provider.path)}
-                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
-                      <span className="text-sm">{provider.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
-                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
-                    </div>
-                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
+              {providers.ticketing.map((provider) => renderProviderCard(provider, 'ticketing'))}
             </div>
           </div>
         </div>
