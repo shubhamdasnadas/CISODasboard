@@ -1,160 +1,44 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useOrg } from '../context/OrgContext';
+import { useProviders } from '../context/ProviderContext';
 
 export default function Settings() {
+  const navigate = useNavigate();
   const { currentOrg } = useOrg();
+  const { selectedProviders, setSelectedProvider } = useProviders();
   const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
 
-  // ── SentinelOne ──────────────────────────────────────────────────────────
-  const [s1AccountId, setS1AccountId] = useState('');
-  const [s1TokenKey, setS1TokenKey] = useState('');
-  const [s1BaseUrl, setS1BaseUrl] = useState('');
-  const [s1Status, setS1Status] = useState('idle'); // idle|saving|syncing|done|error
-  const [s1Msg, setS1Msg] = useState('');
-
-  useEffect(() => {
-    api.get('/sentinelone/credentials').then(r => {
-      if (r.data.accountId) setS1AccountId(r.data.accountId);
-      if (r.data.tokenKey) setS1TokenKey(r.data.tokenKey);
-      if (r.data.baseUrl) setS1BaseUrl(r.data.baseUrl);
-    }).catch(() => {});
-  }, []);
-
-  const handleS1SaveSync = async () => {
-    if (!s1TokenKey.trim()) {
-      setS1Msg('tokenKey is required');
-      setS1Status('error');
-      return;
-    }
-    setS1Status('saving'); setS1Msg('Saving credentials…');
-    try {
-      await api.put('/sentinelone/credentials', { accountId: s1AccountId.trim(), tokenKey: s1TokenKey.trim(), baseUrl: s1BaseUrl.trim() });
-      setS1Status('syncing'); setS1Msg('Syncing SentinelOne data…');
-      const r = await api.post('/sentinelone/sync');
-      const warnings = r.data.warnings?.length ? ` ⚠ ${r.data.warnings.join('; ')}` : '';
-      setS1Msg((r.data.message || 'Sync complete') + warnings);
-      setS1Status(r.data.warnings?.length ? 'error' : 'done');
-    } catch (err) {
-      setS1Msg(err.response?.data?.message || 'Error');
-      setS1Status('error');
-    }
+  // Available providers for each category
+  const providers = {
+    edr: [
+      { name: 'SentinelOne', path: '/settings/sentinelone', icon: '🛡️', color: 'emerald' },
+      { name: 'CrowdStrike', path: '/settings/crowdstrike', icon: '🔒', color: 'purple' },
+    ],
+    emailSecurity: [
+      { name: 'Check Point Harmony', path: '/settings/harmony', icon: '✅', color: 'indigo' },
+      { name: 'Mimecast', path: '/settings/mimecast', icon: '📧', color: 'blue' },
+    ],
+    firewall: [
+      { name: 'Palo Alto', path: '/settings/firewall', icon: '🔥', color: 'orange' },
+      { name: 'Fortinet', path: '/settings/fortinet', icon: '🏰', color: 'red' },
+    ],
+    ticketing: [
+      { name: 'Zoho Desk', path: '/settings/zoho', icon: '🎫', color: 'red' },
+      { name: 'ServiceNow', path: '/settings/servicenow', icon: '💼', color: 'green' },
+    ],
   };
 
-  // ── Palo Alto Firewall ───────────────────────────────────────────────────
-  const [fwBaseUrl, setFwBaseUrl] = useState('');
-  const [fwApiKey, setFwApiKey] = useState('');
-  const [fwStatus, setFwStatus] = useState('idle');
-  const [fwMsg, setFwMsg] = useState('');
-
-  useEffect(() => {
-    api.get('/firewall/credentials').then(r => {
-      if (r.data.baseUrl) setFwBaseUrl(r.data.baseUrl);
-      if (r.data.apiKey) setFwApiKey(r.data.apiKey);
-    }).catch(() => {});
-  }, []);
-
-  const handleFwSaveSync = async () => {
-    if (!fwBaseUrl.trim() || !fwApiKey.trim()) {
-      setFwMsg('Base URL and API Key are required'); setFwStatus('error'); return;
-    }
-    setFwStatus('saving'); setFwMsg('Saving credentials…');
-    try {
-      await api.put('/firewall/credentials', { baseUrl: fwBaseUrl.trim(), apiKey: fwApiKey.trim() });
-      setFwStatus('syncing'); setFwMsg('Collecting firewall reports…');
-      const r = await api.post('/firewall/collect');
-      setFwMsg(`Done — ${r.data.success}/${r.data.total} reports saved.`);
-      setFwStatus('done');
-    } catch (err) {
-      setFwMsg(err.response?.data?.message || 'Error');
-      setFwStatus('error');
-    }
-  };
-
-  // ── Harmony ──────────────────────────────────────────────────────────────
-  const [cpClientId, setCpClientId] = useState('');
-  const [cpAccessKey, setCpAccessKey] = useState('');
-  const [cpStatus, setCpStatus] = useState('idle'); // idle|auth|fetching|done|error
-  const [cpMsg, setCpMsg] = useState('');
-
-  useEffect(() => {
-    api.get('/harmony/credentials').then(r => {
-      if (r.data.clientId) setCpClientId(r.data.clientId);
-      if (r.data.accessKey) setCpAccessKey(r.data.accessKey);
-    }).catch(() => {});
-  }, []);
-
-  const handleHarmonySync = async () => {
-    if (!cpClientId.trim() || !cpAccessKey.trim()) {
-      setCpMsg('Client ID and Access Key are required'); setCpStatus('error'); return;
-    }
-    setCpStatus('auth'); setCpMsg('Authenticating…');
-    try {
-      // Save credentials first
-      await api.put('/harmony/credentials', { clientId: cpClientId.trim(), accessKey: cpAccessKey.trim() });
-      // Trigger sync (backend fetches token + syncs)
-      setCpStatus('fetching'); setCpMsg('Fetching & saving events…');
-      const r = await api.post('/harmony/sync');
-      setCpMsg(`Sync complete — ${r.data.upserted} events saved (${r.data.totalInDb} total).`);
-      setCpStatus('done');
-    } catch (err) {
-      setCpMsg(err.response?.data?.message || 'Sync failed');
-      setCpStatus('error');
-    }
-  };
-
-  // ── Zoho Desk ────────────────────────────────────────────────────────────
-  const [zhClientId, setZhClientId] = useState('');
-  const [zhClientSecret, setZhClientSecret] = useState('');
-  const [zhRedirectUri, setZhRedirectUri] = useState('');
-  const [zhOrgId, setZhOrgId] = useState('');
-  const [zhDomain, setZhDomain] = useState('');
-  const [zhCode, setZhCode] = useState('');
-  const [zhStatus, setZhStatus] = useState('idle'); // idle|saving|syncing|done|error
-  const [zhMsg, setZhMsg] = useState('');
-
-  useEffect(() => {
-    api.get('/zoho/credentials').then(r => {
-      if (r.data.clientId) setZhClientId(r.data.clientId);
-      if (r.data.clientSecret) setZhClientSecret(r.data.clientSecret);
-      if (r.data.redirectUri) setZhRedirectUri(r.data.redirectUri);
-      if (r.data.orgId) setZhOrgId(r.data.orgId);
-      if (r.data.domain) setZhDomain(r.data.domain);
-      if (r.data.code) setZhCode(r.data.code);
-    }).catch(() => {});
-  }, []);
-
-  const handleZohoSaveSync = async () => {
-    if (!zhClientId.trim() || !zhClientSecret.trim()) {
-      setZhMsg('Client ID and Client Secret are required'); setZhStatus('error'); return;
-    }
-    setZhStatus('saving'); setZhMsg('Saving credentials…');
-    try {
-      await api.put('/zoho/credentials', {
-        clientId: zhClientId.trim(), clientSecret: zhClientSecret.trim(),
-        redirectUri: zhRedirectUri.trim(), orgId: zhOrgId.trim(),
-        domain: zhDomain.trim(), code: zhCode.trim(),
-      });
-      setZhStatus('syncing'); setZhMsg('Syncing Zoho tickets…');
-      const r = await api.post('/zoho/credentials-sync');
-      setZhMsg(r.data.message || 'Sync complete');
-      setZhStatus(r.data.stale && !r.data.success ? 'error' : 'done');
-    } catch (err) {
-      setZhMsg(err.response?.data?.message || 'Sync failed');
-      setZhStatus('error');
-    }
-  };
-
-  // ── Sync All ─────────────────────────────────────────────────────────────
+  // Sync All functionality
   const [syncAllStatus, setSyncAllStatus] = useState('idle');
-  const [syncStep, setSyncStep]           = useState(null);
-  const [syncResults, setSyncResults]     = useState(null);
-  const [syncedAt, setSyncedAt]           = useState(null);
+  const [syncStep, setSyncStep] = useState(null);
+  const [syncResults, setSyncResults] = useState(null);
+  const [syncedAt, setSyncedAt] = useState(null);
 
   const parseSyncResults = (data) => {
-    // Try to extract per-service rows from various backend shapes
     const results = data?.results || [];
-    const byKey   = data || {};
+    const byKey = data || {};
 
     const extract = (keys, fallbackMsg) => {
       // Try array of results first
@@ -174,14 +58,15 @@ export default function Settings() {
     };
 
     return {
-      s1:      extract(['sentinelone', 's1', 'sentinel'], 'Synced'),
+      s1: extract(['sentinelone', 's1', 'sentinel'], 'Synced'),
       firewall: extract(['firewall', 'paloalto', 'palo'], 'Synced'),
-      harmony:  extract(['harmony', 'checkpoint', 'cp'], 'Synced'),
+      harmony: extract(['harmony', 'checkpoint', 'cp'], 'Synced'),
     };
   };
 
   const handleSyncAll = async () => {
-    setSyncAllStatus('running'); setSyncResults(null);
+    setSyncAllStatus('running');
+    setSyncResults(null);
     setSyncStep('authenticating');
     try {
       const r = await api.post('/sync/all');
@@ -206,14 +91,31 @@ export default function Settings() {
     error: 'text-red-500',
   }[s] || '');
 
+  const getColorClass = (color) => {
+    const colors = {
+      emerald: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600',
+      purple: 'bg-purple-100 dark:bg-purple-900/40 text-purple-600',
+      indigo: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600',
+      blue: 'bg-blue-100 dark:bg-blue-900/40 text-blue-600',
+      orange: 'bg-orange-100 dark:bg-orange-900/40 text-orange-600',
+      red: 'bg-red-100 dark:bg-red-900/40 text-red-600',
+      green: 'bg-green-100 dark:bg-green-900/40 text-green-600',
+    };
+    return colors[color] || colors.indigo;
+  };
+
+  const handleSetProvider = (category, providerName) => {
+    setSelectedProvider(category, providerName);
+  };
+
   return (
-    <div className="p-6 lg:p-8 max-w-2xl">
+    <div className="p-6 lg:p-8 max-w-6xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Settings</h1>
         {currentOrg && <p className="text-[var(--muted)] text-sm mt-1">{currentOrg.org_name}</p>}
       </div>
 
-      <div className="space-y-5">
+      <div className="space-y-6">
         {/* Account Info */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
@@ -243,7 +145,7 @@ export default function Settings() {
             </div>
             <div>
               <h3 className="font-semibold text-indigo-900 dark:text-indigo-200">Sync All Integrations</h3>
-              <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">Runs SentinelOne, Firewall, and Harmony syncs for this org</p>
+              <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">Runs all configured syncs for this org</p>
             </div>
           </div>
           <div className="p-6 space-y-4">
@@ -271,9 +173,9 @@ export default function Settings() {
                 </div>
                 <div className="divide-y divide-[var(--card-border)]">
                   {[
-                    { key: 's1',       label: 'SentinelOne', icon: '🛡️',  color: 'border-l-emerald-500' },
-                    { key: 'firewall', label: 'Firewall',    icon: '🔥',  color: 'border-l-orange-500' },
-                    { key: 'harmony',  label: 'Checkpoint',  icon: '✅',  color: 'border-l-indigo-500' },
+                    { key: 's1', label: 'SentinelOne', icon: '🛡️', color: 'border-l-emerald-500' },
+                    { key: 'firewall', label: 'Firewall', icon: '🔥', color: 'border-l-orange-500' },
+                    { key: 'harmony', label: 'Checkpoint', icon: '✅', color: 'border-l-indigo-500' },
                   ].map(({ key, label, icon, color }) => {
                     const row = syncResults[key];
                     if (!row) return null;
@@ -296,154 +198,194 @@ export default function Settings() {
           </div>
         </div>
 
-        {/* SentinelOne */}
+        {/* EDR Section */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-              <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-[var(--foreground)]">SentinelOne</h3>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Endpoint protection — sync threats and agents</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[
-              { label: 'Account ID', val: s1AccountId, set: setS1AccountId, ph: 'e.g. 1234567890', type: 'text' },
-              { label: 'Token Key', val: s1TokenKey, set: setS1TokenKey, ph: 'API token', type: 'password' },
-              { label: 'Base URL (optional)', val: s1BaseUrl, set: setS1BaseUrl, ph: 'https://your-console.sentinelone.net', type: 'text' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">{f.label}</label>
-                <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  className="w-full px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
               </div>
-            ))}
-            <div className="flex items-center gap-4 pt-1">
-              <button onClick={handleS1SaveSync} disabled={s1Status === 'saving' || s1Status === 'syncing'}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                {s1Status === 'saving' || s1Status === 'syncing' ? (
-                  <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{s1Status === 'saving' ? 'Saving…' : 'Syncing…'}</>
-                ) : 'Save & Sync'}
-              </button>
-              {s1Msg && <span className={`text-sm font-medium ${statusColor(s1Status)}`}>{s1Msg}</span>}
+              <div>
+                <h3 className="font-semibold text-[var(--foreground)]">
+                  {selectedProviders.edr || 'EDR (Endpoint Detection & Response)'}
+                </h3>
+                <p className="text-xs text-[var(--muted)] mt-0.5">Configure endpoint protection integration</p>
+              </div>
+            </div>
+            {selectedProviders.edr && (
+              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-medium">
+                Active: {selectedProviders.edr}
+              </span>
+            )}
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {providers.edr.map((provider) => (
+                <div
+                  key={provider.name}
+                  onClick={() => navigate(provider.path)}
+                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
+                      <span className="text-sm">{provider.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
+                    </div>
+                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Palo Alto Firewall */}
+        {/* Email Security Section */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-              <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-[var(--foreground)]">Palo Alto Firewall</h3>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Network firewall — collect security reports</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[
-              { label: 'Base URL', val: fwBaseUrl, set: setFwBaseUrl, ph: 'https://192.168.1.1:443', type: 'text' },
-              { label: 'API Key', val: fwApiKey, set: setFwApiKey, ph: 'Palo Alto API key', type: 'password' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">{f.label}</label>
-                <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  className="w-full px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
               </div>
-            ))}
-            <div className="flex items-center gap-4 pt-1">
-              <button onClick={handleFwSaveSync} disabled={fwStatus === 'saving' || fwStatus === 'syncing'}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                {fwStatus === 'saving' || fwStatus === 'syncing' ? (
-                  <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{fwStatus === 'saving' ? 'Saving…' : 'Collecting…'}</>
-                ) : 'Save & Collect'}
-              </button>
-              {fwMsg && <span className={`text-sm font-medium ${statusColor(fwStatus)}`}>{fwMsg}</span>}
+              <div>
+                <h3 className="font-semibold text-[var(--foreground)]">
+                  {selectedProviders.emailSecurity || 'Email Security'}
+                </h3>
+                <p className="text-xs text-[var(--muted)] mt-0.5">Configure email protection integration</p>
+              </div>
+            </div>
+            {selectedProviders.emailSecurity && (
+              <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full font-medium">
+                Active: {selectedProviders.emailSecurity}
+              </span>
+            )}
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {providers.emailSecurity.map((provider) => (
+                <div
+                  key={provider.name}
+                  onClick={() => navigate(provider.path)}
+                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
+                      <span className="text-sm">{provider.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
+                    </div>
+                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Check Point Harmony */}
+        {/* Firewall Section */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-              <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-[var(--foreground)]">Harmony Email & Collaboration</h3>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Check Point — fetch phishing, malware, DLP events</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[
-              { label: 'Client ID', val: cpClientId, set: setCpClientId, ph: 'e.g. 44550823d…', type: 'text' },
-              { label: 'Access Key', val: cpAccessKey, set: setCpAccessKey, ph: 'e.g. 0a204c1a2…', type: 'password' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">{f.label}</label>
-                <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  className="w-full px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--foreground)] font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                </svg>
               </div>
-            ))}
-            <div className="flex items-center gap-4 pt-1">
-              <button onClick={handleHarmonySync} disabled={cpStatus === 'auth' || cpStatus === 'fetching'}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                {cpStatus === 'auth' || cpStatus === 'fetching' ? (
-                  <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{cpStatus === 'auth' ? 'Authenticating…' : 'Syncing…'}</>
-                ) : 'Save & Sync'}
-              </button>
-              {cpMsg && <span className={`text-sm font-medium ${statusColor(cpStatus)}`}>{cpMsg}</span>}
+              <div>
+                <h3 className="font-semibold text-[var(--foreground)]">
+                  {selectedProviders.firewall || 'Firewall'}
+                </h3>
+                <p className="text-xs text-[var(--muted)] mt-0.5">Configure network firewall integration</p>
+              </div>
+            </div>
+            {selectedProviders.firewall && (
+              <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-full font-medium">
+                Active: {selectedProviders.firewall}
+              </span>
+            )}
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {providers.firewall.map((provider) => (
+                <div
+                  key={provider.name}
+                  onClick={() => navigate(provider.path)}
+                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
+                      <span className="text-sm">{provider.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
+                    </div>
+                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
-        {/* Zoho Desk */}
+        {/* Ticketing Section */}
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-semibold text-[var(--foreground)]">Zoho Desk</h3>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Support tickets — sync department/status data</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[
-              { label: 'Client ID', val: zhClientId, set: setZhClientId, ph: '1000.XXXXXXXXXX', type: 'text' },
-              { label: 'Client Secret', val: zhClientSecret, set: setZhClientSecret, ph: 'Zoho API console client secret', type: 'password' },
-              { label: 'Authorization Code (optional)', val: zhCode, set: setZhCode, ph: 'Single-use OAuth code — leave blank to keep showing cached data', type: 'password' },
-              { label: 'Redirect URI (optional)', val: zhRedirectUri, set: setZhRedirectUri, ph: 'https://your-app.com/oauthgrant', type: 'text' },
-              { label: 'Org ID (optional)', val: zhOrgId, set: setZhOrgId, ph: 'e.g. 60021258041', type: 'text' },
-              { label: 'Domain (optional)', val: zhDomain, set: setZhDomain, ph: 'https://desk.zoho.in', type: 'text' },
-            ].map(f => (
-              <div key={f.label}>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">{f.label}</label>
-                <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                  className="w-full px-4 py-2.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-xl text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
               </div>
-            ))}
-            <p className="text-xs text-[var(--muted)]">
-              The authorization code is single-use and expires quickly. If it's left blank, already used, or expired, "Save & Sync" will keep showing the last successfully synced data instead of failing — paste in a fresh code from Zoho's OAuth consent screen whenever you want a live refresh.
-            </p>
-            <div className="flex items-center gap-4 pt-1">
-              <button onClick={handleZohoSaveSync} disabled={zhStatus === 'saving' || zhStatus === 'syncing'}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                {zhStatus === 'saving' || zhStatus === 'syncing' ? (
-                  <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{zhStatus === 'saving' ? 'Saving…' : 'Syncing…'}</>
-                ) : 'Save & Sync'}
-              </button>
-              {zhMsg && <span className={`text-sm font-medium ${statusColor(zhStatus)}`}>{zhMsg}</span>}
+              <div>
+                <h3 className="font-semibold text-[var(--foreground)]">
+                  {selectedProviders.ticketing || 'Ticketing'}
+                </h3>
+                <p className="text-xs text-[var(--muted)] mt-0.5">Configure support ticketing integration</p>
+              </div>
+            </div>
+            {selectedProviders.ticketing && (
+              <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full font-medium">
+                Active: {selectedProviders.ticketing}
+              </span>
+            )}
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {providers.ticketing.map((provider) => (
+                <div
+                  key={provider.name}
+                  onClick={() => navigate(provider.path)}
+                  className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 cursor-pointer transition-colors group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
+                      <span className="text-sm">{provider.icon}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+                      <p className="text-xs text-[var(--muted)]">Click to configure</p>
+                    </div>
+                    <svg className="w-4 h-4 text-[var(--muted)] group-hover:text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
