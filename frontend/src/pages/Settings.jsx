@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useOrg } from '../context/OrgContext';
@@ -9,6 +9,7 @@ export default function Settings() {
   const { currentOrg } = useOrg();
   const { selectedProviders, setSelectedProvider } = useProviders();
   const user = JSON.parse(localStorage.getItem('ciso_user') || '{}');
+  const [activeTab, setActiveTab] = useState('account');
 
   // Available providers for each category
   const providers = {
@@ -40,12 +41,10 @@ export default function Settings() {
     const results = data?.results || [];
     const byKey = data || {};
     const extract = (keys, fallbackMsg) => {
-      // Try array of results first
       for (const key of keys) {
         const found = results.find((r) => r.service?.toLowerCase().includes(key) || r.name?.toLowerCase().includes(key));
         if (found) return { ok: found.success ?? found.ok ?? false, msg: found.message || found.msg || fallbackMsg };
       }
-      // Try top-level keys
       for (const key of keys) {
         if (byKey[key] !== undefined) {
           const v = byKey[key];
@@ -119,16 +118,10 @@ export default function Settings() {
         </div>
       </div>
       <div className="mt-4 flex gap-2">
-        <button
-          onClick={() => navigate(provider.path)}
-          className="flex-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium"
-        >
+        <button onClick={() => navigate(provider.path)} className="flex-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium">
           Configure
         </button>
-        <button
-          onClick={() => handleSetProvider(category, provider.name)}
-          className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium"
-        >
+        <button onClick={() => handleSetProvider(category, provider.name)} className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
           Set as Active
         </button>
       </div>
@@ -142,202 +135,233 @@ export default function Settings() {
         {currentOrg && <p className="text-[var(--muted)] text-sm mt-1">{currentOrg.org_name}</p>}
       </div>
 
-      <div className="space-y-6">
-        {/* Account Info */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
-            <h3 className="font-semibold text-[var(--foreground)]">Account Information</h3>
-          </div>
-          <div className="p-6 space-y-0 divide-y divide-[var(--card-border)]">
-            {[
-              { label: 'Username', value: user.username },
-              { label: 'Role', value: user.role },
-              { label: 'Organisation', value: currentOrg?.org_name },
-            ].filter(i => i.value).map(item => (
-              <div key={item.label} className="flex items-center justify-between py-3.5">
-                <p className="text-sm font-medium text-[var(--muted)]">{item.label}</p>
-                <p className="text-sm text-[var(--foreground)] capitalize">{item.value}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="border-b border-[var(--card-border)] mb-6">
+        <nav className="flex gap-2">
+          <button
+            onClick={() => setActiveTab('account')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+              activeTab === 'account' ? 'bg-indigo-600 text-white' : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--muted-bg)]'
+            }`}
+          >
+            Account
+          </button>
+          <button
+            onClick={() => setActiveTab('integrations')}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${
+              activeTab === 'integrations' ? 'bg-indigo-600 text-white' : 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[var(--muted-bg)]'
+            }`}
+          >
+            Integrations
+          </button>
+        </nav>
+      </div>
 
-        {/* Sync All */}
-        <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-100 dark:bg-indigo-900/30 flex items-center gap-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
+      {/* Tab Content */}
+      <div className="space-y-6">
+        {activeTab === 'account' && (
+          <>
+            {/* Account Info */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
+                <h3 className="font-semibold text-[var(--foreground)]">Account Information</h3>
+              </div>
+              <div className="p-6 space-y-0 divide-y divide-[var(--card-border)]">
+                {[
+                  { label: 'Username', value: user.username },
+                  { label: 'Role', value: user.role },
+                  { label: 'Organisation', value: currentOrg?.org_name },
+                ]
+                  .filter((i) => i.value)
+                  .map((item) => (
+                    <div key={item.label} className="flex items-center justify-between py-3.5">
+                      <p className="text-sm font-medium text-[var(--muted)]">{item.label}</p>
+                      <p className="text-sm text-[var(--foreground)] capitalize">{item.value}</p>
+                    </div>
+                  ))}
+              </div>
             </div>
-            <div>
-              <h3 className="font-semibold text-indigo-900 dark:text-indigo-200">Sync All Integrations</h3>
-              <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">Runs all configured syncs for this org</p>
-            </div>
-          </div>
-          <div className="p-6 space-y-4">
-            <div className="flex items-center gap-4 flex-wrap">
-              <button
-                onClick={handleSyncAll}
-                disabled={syncAllStatus === 'running'}
-                className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-semibold"
-              >
-                {syncAllStatus === 'running' ? (
-                  <>
-                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                    {syncStep === 'authenticating' ? 'Authenticating…' : 'Syncing…'}
-                  </>
-                ) : 'Sync All Now'}
+
+            {/* Danger Zone */}
+            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-2xl p-6">
+              <h3 className="font-semibold text-red-900 dark:text-red-400 mb-1">Danger Zone</h3>
+              <p className="text-sm text-red-700 dark:text-red-500 mb-4">These actions are irreversible.</p>
+              <button className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-700">
+                Delete Account
               </button>
             </div>
-            {/* Per-service results breakdown */}
-            {syncResults && (
-              <div className="border border-[var(--card-border)] rounded-xl overflow-hidden">
-                <div className="px-4 py-2.5 bg-[var(--muted-bg)] border-b border-[var(--card-border)] flex items-center justify-between">
-                  <p className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest">Sync Results</p>
-                  {syncedAt && <p className="text-[10px] text-[var(--muted)]">Last synced: {syncedAt}</p>}
+          </>
+        )}
+
+        {activeTab === 'integrations' && (
+          <>
+            {/* Sync All */}
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-100 dark:bg-indigo-900/30 flex items-center gap-3">
+                <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
                 </div>
-                <div className="divide-y divide-[var(--card-border)]">
-                  {[
-                    { key: 's1', label: 'SentinelOne', icon: '🛡️', color: 'border-l-emerald-500' },
-                    { key: 'firewall', label: 'Firewall', icon: '🔥', color: 'border-l-orange-500' },
-                    { key: 'harmony', label: 'Checkpoint', icon: '✅', color: 'border-l-indigo-500' },
-                  ].map(({ key, label, icon, color }) => {
-                    const row = syncResults[key];
-                    if (!row) return null;
-                    return (
-                      <div key={key} className={`flex items-start gap-3 px-4 py-3 border-l-4 ${row.ok ? color : 'border-l-red-500'}`}>
-                        <span className="text-sm mt-0.5">{icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-semibold text-[var(--foreground)]">{label}</p>
-                          <p className={`text-[11px] mt-0.5 truncate ${row.ok ? 'text-[var(--muted)]' : 'text-red-500'}`}>{row.msg}</p>
-                        </div>
-                        <span className={`text-[10px] font-bold flex-shrink-0 mt-0.5 ${row.ok ? 'text-green-600' : 'text-red-500'}`}>
-                          {row.ok ? '✓ OK' : '✗ Failed'}
-                        </span>
-                      </div>
-                    );
-                  })}
+                <div>
+                  <h3 className="font-semibold text-indigo-900 dark:text-indigo-200">Sync All Integrations</h3>
+                  <p className="text-xs text-indigo-700 dark:text-indigo-400 mt-0.5">Runs all configured syncs for this org</p>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-4 flex-wrap">
+                  <button
+                    onClick={handleSyncAll}
+                    disabled={syncAllStatus === 'running'}
+                    className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-6 py-2.5 rounded-xl text-sm font-semibold"
+                  >
+                    {syncAllStatus === 'running' ? (
+                      <>
+                        <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                        {syncStep === 'authenticating' ? 'Authenticating…' : 'Syncing…'}
+                      </>
+                    ) : (
+                      'Sync All Now'
+                    )}
+                  </button>
+                </div>
+                {/* Per-service results breakdown */}
+                {syncResults && (
+                  <div className="border border-[var(--card-border)] rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-[var(--muted-bg)] border-b border-[var(--card-border)] flex items-center justify-between">
+                      <p className="text-xs font-bold text-[var(--foreground)] uppercase tracking-widest">Sync Results</p>
+                      {syncedAt && <p className="text-[10px] text-[var(--muted)]">Last synced: {syncedAt}</p>}
+                    </div>
+                    <div className="divide-y divide-[var(--card-border)]">
+                      {[
+                        { key: 's1', label: 'SentinelOne', icon: '🛡️', color: 'border-l-emerald-500' },
+                        { key: 'firewall', label: 'Firewall', icon: '🔥', color: 'border-l-orange-500' },
+                        { key: 'harmony', label: 'Checkpoint', icon: '✅', color: 'border-l-indigo-500' },
+                      ].map(({ key, label, icon, color }) => {
+                        const row = syncResults[key];
+                        if (!row) return null;
+                        return (
+                          <div key={key} className={`flex items-start gap-3 px-4 py-3 border-l-4 ${row.ok ? color : 'border-l-red-500'}`}>
+                            <span className="text-sm mt-0.5">{icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-[var(--foreground)]">{label}</p>
+                              <p className={`text-[11px] mt-0.5 truncate ${row.ok ? 'text-[var(--muted)]' : 'text-red-500'}`}>{row.msg}</p>
+                            </div>
+                            <span className={`text-[10px] font-bold flex-shrink-0 mt-0.5 ${row.ok ? 'text-green-600' : 'text-red-500'}`}>
+                              {row.ok ? '✓ OK' : '✗ Failed'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-        {/* EDR Section */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
-                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
+            {/* EDR Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.edr || 'EDR (Endpoint Detection & Response)'}</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure endpoint protection integration</p>
+                  </div>
+                </div>
+                {selectedProviders.edr && (
+                  <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-medium">
+                    Active: {selectedProviders.edr}
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.edr || 'EDR (Endpoint Detection & Response)'}</h3>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Configure endpoint protection integration</p>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.edr.map((provider) => renderProviderCard(provider, 'edr'))}</div>
               </div>
             </div>
-            {selectedProviders.edr && (
-              <span className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 px-2 py-1 rounded-full font-medium">
-                Active: {selectedProviders.edr}
-              </span>
-            )}
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.edr.map((provider) => renderProviderCard(provider, 'edr'))}
-            </div>
-          </div>
-        </div>
 
-        {/* Email Security Section */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
+            {/* Email Security Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.emailSecurity || 'Email Security'}</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure email protection integration</p>
+                  </div>
+                </div>
+                {selectedProviders.emailSecurity && (
+                  <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full font-medium">
+                    Active: {selectedProviders.emailSecurity}
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.emailSecurity || 'Email Security'}</h3>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Configure email protection integration</p>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {providers.emailSecurity.map((provider) => renderProviderCard(provider, 'emailSecurity'))}
+                </div>
               </div>
             </div>
-            {selectedProviders.emailSecurity && (
-              <span className="text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-2 py-1 rounded-full font-medium">
-                Active: {selectedProviders.emailSecurity}
-              </span>
-            )}
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.emailSecurity.map((provider) => renderProviderCard(provider, 'emailSecurity'))}
-            </div>
-          </div>
-        </div>
 
-        {/* Firewall Section */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
-                </svg>
+            {/* Firewall Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.firewall || 'Firewall'}</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure network firewall integration</p>
+                  </div>
+                </div>
+                {selectedProviders.firewall && (
+                  <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-full font-medium">
+                    Active: {selectedProviders.firewall}
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.firewall || 'Firewall'}</h3>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Configure network firewall integration</p>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.firewall.map((provider) => renderProviderCard(provider, 'firewall'))}</div>
               </div>
             </div>
-            {selectedProviders.firewall && (
-              <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-full font-medium">
-                Active: {selectedProviders.firewall}
-              </span>
-            )}
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.firewall.map((provider) => renderProviderCard(provider, 'firewall'))}
-            </div>
-          </div>
-        </div>
 
-        {/* Ticketing Section */}
-        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
+            {/* Ticketing Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.ticketing || 'Ticketing'}</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure support ticketing integration</p>
+                  </div>
+                </div>
+                {selectedProviders.ticketing && (
+                  <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full font-medium">
+                    Active: {selectedProviders.ticketing}
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.ticketing || 'Ticketing'}</h3>
-                <p className="text-xs text-[var(--muted)] mt-0.5">Configure support ticketing integration</p>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.ticketing.map((provider) => renderProviderCard(provider, 'ticketing'))}</div>
               </div>
             </div>
-            {selectedProviders.ticketing && (
-              <span className="text-xs bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 px-2 py-1 rounded-full font-medium">
-                Active: {selectedProviders.ticketing}
-              </span>
-            )}
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {providers.ticketing.map((provider) => renderProviderCard(provider, 'ticketing'))}
-            </div>
-          </div>
-        </div>
-
-        {/* Danger Zone */}
-        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-2xl p-6">
-          <h3 className="font-semibold text-red-900 dark:text-red-400 mb-1">Danger Zone</h3>
-          <p className="text-sm text-red-700 dark:text-red-500 mb-4">These actions are irreversible.</p>
-          <button className="bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-700">Delete Account</button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
