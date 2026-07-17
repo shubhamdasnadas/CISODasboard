@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -140,7 +141,7 @@ const makeTopChartData = (rows, cols, limit = 8) => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .reverse()
-    .map(([name, value]) => ({ name: name.length > 28 ? name.slice(0, 28) + '…' : name, value }));
+    .map(([name, value]) => ({ name: name.length > 28 ? name.slice(0, 28) + '…' : name, fullName: name, value }));
 };
 
 const makeRiskTrendData = (rows) => {
@@ -178,9 +179,12 @@ const getSecurityScoreStatus = (score) => {
 
 // ── Reusable Components ───────────────────────────────────────────────────────
 
-function KpiCard({ title, value, subtitle, icon, color }) {
+function KpiCard({ title, value, subtitle, icon, color, onClick }) {
   return (
-    <div className="relative flex min-h-[156px] w-full overflow-hidden rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-1 bg-[var(--card-bg)] border-[var(--card-border)]">
+    <div
+      onClick={onClick}
+      className={`relative flex min-h-[156px] w-full overflow-hidden rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-1 bg-[var(--card-bg)] border-[var(--card-border)] ${onClick ? 'cursor-pointer' : ''}`}
+    >
       <div className="absolute right-0 top-0 h-20 w-20 rounded-bl-[40px]" style={{ backgroundColor: color, opacity: 0.15 }} />
       <div className="flex w-full flex-col justify-between pr-12">
         <div>
@@ -239,7 +243,6 @@ function ChartCard({ title, subtitle, children, dateRange, onDateChange }) {
               className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
           )}
         </div>
-        {controls && <div className="flex items-center gap-2">{controls}</div>}
       </div>
       {children}
     </div>
@@ -273,6 +276,7 @@ function KpiDateFilter({ kpiDateRange, onKpiDateChange }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function PaloAltoPage() {
+  const navigate = useNavigate();
   const [kpiDateRange, setKpiDateRange] = useState({ from: '', to: '' });
   const [componentDateRanges, setComponentDateRanges] = useState({
     riskTrend: { from: '', to: '' },
@@ -323,6 +327,19 @@ export default function PaloAltoPage() {
     }));
   };
 
+  // Firewall report rows are already fully loaded client-side, so drilldowns
+  // hand the matched rows straight to DetailView via router state instead of
+  // having it re-fetch/re-derive them. These rows are pre-aggregated Panorama
+  // report entries (e.g. one row per day+risk bucket with a count/session
+  // field), not one row per individual event — DetailView sums that count
+  // column itself to show alongside the raw row count.
+  const goToDetail = (rows, title, dateRange) => navigate('/security/detail', {
+    state: { dataset: 'firewall', rows, title, dateFrom: dateRange?.from, dateTo: dateRange?.to },
+  });
+
+  const matchRows = (rows, cols, value) =>
+    rows.filter((row) => String(getFirstValue(row, cols, '')).trim() === value);
+
   // Charts each carry their own independent date filter (componentDateRanges)
   // and are otherwise sourced from the full, unfiltered report set — there is
   // no page-wide date filter. Only the KPI card row below has a shared range.
@@ -332,17 +349,17 @@ export default function PaloAltoPage() {
   );
 
   const kpiRows = useMemo(
-    () => filterRowsByDate(allRows, kpiDateRange),
+    () => filterRowsByDate(allRows, kpiDateRange.from, kpiDateRange.to),
     [allRows, kpiDateRange]
   );
 
   const dashboard = useMemo(() => {
     const riskRowsAll = getRowsByReport(allReports, 'risk-trend');
-    const riskTrendRows = filterRowsByDate(riskRowsAll, componentDateRanges.riskTrend);
-    const riskDistRows  = filterRowsByDate(riskRowsAll, componentDateRanges.riskDistribution);
+    const riskTrendRows = filterRowsByDate(riskRowsAll, componentDateRanges.riskTrend.from, componentDateRanges.riskTrend.to);
+    const riskDistRows  = filterRowsByDate(riskRowsAll, componentDateRanges.riskDistribution.from, componentDateRanges.riskDistribution.to);
 
     const attackerSourceRowsAll = getRowsByReport(allReports, 'top-attacker-sources');
-    const attackerSourceRows = filterRowsByDate(attackerSourceRowsAll, componentDateRanges.topSources);
+    const attackerSourceRows = filterRowsByDate(attackerSourceRowsAll, componentDateRanges.topSources.from, componentDateRanges.topSources.to);
 
     const attackerDestRowsAll = getRowsByReport(allReports, 'top-attacker-destinations');
 
@@ -351,22 +368,22 @@ export default function PaloAltoPage() {
       ...getRowsByReport(allReports, 'top-denied-sources'),
       ...getRowsByReport(allReports, 'top-denied-applications'),
     ];
-    const deniedRows = filterRowsByDate(deniedRowsAll, componentDateRanges.topDeniedDestinations);
+    const deniedRows = filterRowsByDate(deniedRowsAll, componentDateRanges.topDeniedDestinations.from, componentDateRanges.topDeniedDestinations.to);
 
     const riskyUserRowsAll = getRowsByReport(allReports, 'risky-users');
 
     const topAttackRowsAll = getRowsByReport(allReports, 'top-attacks');
-    const topAttackRows = filterRowsByDate(topAttackRowsAll, componentDateRanges.topAttacks);
+    const topAttackRows = filterRowsByDate(topAttackRowsAll, componentDateRanges.topAttacks.from, componentDateRanges.topAttacks.to);
 
     const connectionRowsAll = getRowsByReport(allReports, 'top-connections');
-    const connectionRows = filterRowsByDate(connectionRowsAll, componentDateRanges.topConnections);
+    const connectionRows = filterRowsByDate(connectionRowsAll, componentDateRanges.topConnections.from, componentDateRanges.topConnections.to);
 
     // KPI cards: all filtered by the single shared kpiDateRange, independent
     // of each chart's own per-chart filter above.
-    const kpiRiskRows = filterRowsByDate(riskRowsAll, kpiDateRange);
-    const kpiAttackerDestRows = filterRowsByDate(attackerDestRowsAll, kpiDateRange);
-    const kpiDeniedRows = filterRowsByDate(deniedRowsAll, kpiDateRange);
-    const kpiRiskyUserRows = filterRowsByDate(riskyUserRowsAll, kpiDateRange);
+    const kpiRiskRows = filterRowsByDate(riskRowsAll, kpiDateRange.from, kpiDateRange.to);
+    const kpiAttackerDestRows = filterRowsByDate(attackerDestRowsAll, kpiDateRange.from, kpiDateRange.to);
+    const kpiDeniedRows = filterRowsByDate(deniedRowsAll, kpiDateRange.from, kpiDateRange.to);
+    const kpiRiskyUserRows = filterRowsByDate(riskyUserRowsAll, kpiDateRange.from, kpiDateRange.to);
 
     const totalSessions = getSumByColumn(kpiRows, ['nsess','sessions','session','count']);
     const totalTraffic = getSumByColumn(kpiRows, ['nbytes','bytes','byte']);
@@ -380,30 +397,49 @@ export default function PaloAltoPage() {
       const action = String(getFirstValue(row, ['action','category','name'], '')).toLowerCase();
       return action.includes('block') || action.includes('deny') || action.includes('drop');
     }).length;
-    const topDestination = makeTopChartData(
-      attackerDestRowsAll.length ? kpiAttackerDestRows : kpiRows,
-      ['dst','destination','destination_ip','name']
-    )[0]?.name || '-';
+    const topDestCols = ['dst','destination','destination_ip','name'];
+    const topDestRows = attackerDestRowsAll.length ? kpiAttackerDestRows : kpiRows;
+    const topDestEntry = makeTopChartData(topDestRows, topDestCols)[0];
+    const topDestination = topDestEntry?.name || '-';
 
     const criticalUsers = kpiRiskyUserRows.length;
     const securityScore = Math.max(0, Math.min(100, Math.round(100 - highRiskEvents * 0.05 - criticalUsers * 2 - blockedConnections * 0.1)));
+
+    const topAttacksCols = ['threatid','threat','name','category'];
+    const topSourcesCols = ['src','source','source_ip','name'];
+    const topDeniedCols = ['dst','destination','destination_ip','name'];
+    const topConnectionsCols = ['name','src','source','dst','destination'];
 
     return {
       totalSessions,
       totalTraffic,
       highRiskEvents,
+      // Rows behind the "High Risk Events" KPI, for its drilldown.
+      highRiskEventRows: kpiRiskRows.filter((row) => parseNumber(getFirstValue(row, ['risk','name','severity'], 0)) >= 4),
       topDestination,
+      topDestinationFull: topDestEntry?.fullName || null,
+      topDestinationRows: topDestRows,
+      topDestinationCols: topDestCols,
       securityScore,
       riskTrendData: makeRiskTrendData(riskRowsAll.length ? riskTrendRows : allRows),
       riskDistribution: makeRiskDistribution(riskDistRows),
-      topAttacks: makeTopChartData(topAttackRowsAll.length ? topAttackRows : allRows, ['threatid','threat','name','category']),
-      topSources: makeTopChartData(attackerSourceRowsAll.length ? attackerSourceRows : allRows, ['src','source','source_ip','name']),
-      topDeniedDestinations: makeTopChartData(deniedRowsAll.length ? deniedRows : allRows, ['dst','destination','destination_ip','name']),
-      topConnections: makeTopChartData(connectionRowsAll.length ? connectionRows : allRows, ['name','src','source','dst','destination']),
+      riskDistributionRows: riskDistRows,
+      topAttacks: makeTopChartData(topAttackRowsAll.length ? topAttackRows : allRows, topAttacksCols),
+      topAttacksRows: topAttackRowsAll.length ? topAttackRows : allRows,
+      topAttacksCols,
+      topSources: makeTopChartData(attackerSourceRowsAll.length ? attackerSourceRows : allRows, topSourcesCols),
+      topSourcesRows: attackerSourceRowsAll.length ? attackerSourceRows : allRows,
+      topSourcesCols,
+      topDeniedDestinations: makeTopChartData(deniedRowsAll.length ? deniedRows : allRows, topDeniedCols),
+      topDeniedDestinationsRows: deniedRowsAll.length ? deniedRows : allRows,
+      topDeniedCols,
+      topConnections: makeTopChartData(connectionRowsAll.length ? connectionRows : allRows, topConnectionsCols),
+      topConnectionsRows: connectionRowsAll.length ? connectionRows : allRows,
+      topConnectionsCols,
     };
   }, [allReports, allRows, kpiRows, kpiDateRange, componentDateRanges]);
 
-  const scoreStatus = getSecurityScoreStatus(kpis.securityScore);
+  const scoreStatus = getSecurityScoreStatus(dashboard.securityScore);
 
   return (
     <div className="min-h-screen p-4 sm:p-6 lg:p-8 bg-[var(--background)]">
@@ -447,11 +483,16 @@ export default function PaloAltoPage() {
             onKpiDateChange={handleKpiDateChange}
           />
           <div className="mb-6 grid grid-cols-[repeat(auto-fit,minmax(230px,1fr))] gap-4">
-            <KpiCard title="Total Sessions"  value={formatNumber(kpis.totalSessions)}      subtitle="nsess / session count"   icon="📊" color="#3b82f6" />
-            <KpiCard title="Total Traffic"   value={formatBytes(kpis.totalTraffic)}         subtitle="nbytes total traffic"    icon="🌐" color="#06b6d4" />
-            <KpiCard title="High Risk Events" value={formatNumber(kpis.highRiskEvents)}     subtitle="Risk 4 + Risk 5"         icon="🔴" color="#ef4444" />
-            <KpiCard title="Top Destination" value={kpis.topDestination}                    subtitle=""                        icon="🎯" color="#0f766e" />
-            <KpiCard title="Security Score"  value={`${kpis.securityScore}/100`}            subtitle={scoreStatus.label}       icon="✅" color={scoreStatus.color} />
+            <KpiCard title="Total Sessions"  value={formatNumber(dashboard.totalSessions)}      subtitle="nsess / session count"   icon="📊" color="#3b82f6" />
+            <KpiCard title="Total Traffic"   value={formatBytes(dashboard.totalTraffic)}         subtitle="nbytes total traffic"    icon="🌐" color="#06b6d4" />
+            <KpiCard title="High Risk Events" value={formatNumber(dashboard.highRiskEvents)}     subtitle="Risk 4 + Risk 5"         icon="🔴" color="#ef4444"
+              onClick={() => goToDetail(dashboard.highRiskEventRows, 'High Risk Events (Risk 4+)', kpiDateRange)} />
+            <KpiCard title="Top Destination" value={dashboard.topDestination}                    subtitle=""                        icon="🎯" color="#0f766e"
+              onClick={dashboard.topDestinationFull ? () => goToDetail(
+                matchRows(dashboard.topDestinationRows, dashboard.topDestinationCols, dashboard.topDestinationFull),
+                `Sessions to ${dashboard.topDestination}`, kpiDateRange,
+              ) : undefined} />
+            <KpiCard title="Security Score"  value={`${dashboard.securityScore}/100`}            subtitle={scoreStatus.label}       icon="✅" color={scoreStatus.color} />
           </div>
 
           {/* Charts */}
@@ -461,7 +502,8 @@ export default function PaloAltoPage() {
             <ChartCard
               title="Risk Trend Over Time"
               subtitle="Bar = traffic bytes, Line = session count"
-              controls={<DateFilter from={riskTrendFilter.from} to={riskTrendFilter.to} onFromChange={riskTrendFilter.setFrom} onToChange={riskTrendFilter.setTo} onClear={riskTrendFilter.clear} />}
+              dateRange={componentDateRanges.riskTrend}
+              onDateChange={(newRange) => handleComponentDateChange('riskTrend', newRange)}
             >
               <div className="h-[360px]">
                 {dashboard.riskTrendData.length === 0 ? (
@@ -483,14 +525,23 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Risk Distribution */}
-            <ChartCard title="Risk-wise Distribution" subtitle="Risk 1 to Risk 5 security distribution">
+            <ChartCard
+              title="Risk-wise Distribution"
+              subtitle="Risk 1 to Risk 5 security distribution"
+              dateRange={componentDateRanges.riskDistribution}
+              onDateChange={(newRange) => handleComponentDateChange('riskDistribution', newRange)}
+            >
               <div className="h-[360px]">
                 {dashboard.riskDistribution.length === 0 ? (
                   <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie data={dashboard.riskDistribution} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }}>
+                      <Pie data={dashboard.riskDistribution} dataKey="value" nameKey="name" outerRadius={115} label={{ fontSize: 11 }} cursor="pointer"
+                        onClick={(entry) => goToDetail(
+                          dashboard.riskDistributionRows.filter((row) => String(getFirstValue(row, ['risk','severity','name'], '-')) === entry.risk),
+                          `${entry.name} Events`, componentDateRanges.riskDistribution,
+                        )}>
                         {dashboard.riskDistribution.map((entry, i) => (
                           <Cell key={i} fill={RISK_COLORS[String(entry.risk)] || COLORS[i % COLORS.length]} />
                         ))}
@@ -503,7 +554,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Attacks */}
-            <ChartCard title="Top Attacks" subtitle="Most repeated firewall threat / attack names">
+            <ChartCard
+              title="Top Attacks"
+              subtitle="Most repeated firewall threat / attack names"
+              dateRange={componentDateRanges.topAttacks}
+              onDateChange={(newRange) => handleComponentDateChange('topAttacks', newRange)}
+            >
               <div className="h-[320px]">
                 {dashboard.topAttacks.length === 0 ? (
                   <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
@@ -514,7 +570,11 @@ export default function PaloAltoPage() {
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="value" radius={[0, 5, 5, 0]}>
+                      <Bar dataKey="value" radius={[0, 5, 5, 0]} cursor="pointer"
+                        onClick={(entry) => goToDetail(
+                          matchRows(dashboard.topAttacksRows, dashboard.topAttacksCols, entry.fullName),
+                          `Attacks: ${entry.fullName}`, componentDateRanges.topAttacks,
+                        )}>
                         {dashboard.topAttacks.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                       </Bar>
                     </BarChart>
@@ -524,7 +584,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Sources */}
-            <ChartCard title="Top Sources" subtitle="Highest source IP / source count">
+            <ChartCard
+              title="Top Sources"
+              subtitle="Highest source IP / source count"
+              dateRange={componentDateRanges.topSources}
+              onDateChange={(newRange) => handleComponentDateChange('topSources', newRange)}
+            >
               <div className="h-[320px]">
                 {dashboard.topSources.length === 0 ? (
                   <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
@@ -535,7 +600,11 @@ export default function PaloAltoPage() {
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 5, 5, 0]} />
+                      <Bar dataKey="value" fill="#3b82f6" radius={[0, 5, 5, 0]} cursor="pointer"
+                        onClick={(entry) => goToDetail(
+                          matchRows(dashboard.topSourcesRows, dashboard.topSourcesCols, entry.fullName),
+                          `Sessions from ${entry.fullName}`, componentDateRanges.topSources,
+                        )} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -543,7 +612,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Denied Destinations */}
-            <ChartCard title="Top Denied Destinations" subtitle="Denied destination systems">
+            <ChartCard
+              title="Top Denied Destinations"
+              subtitle="Denied destination systems"
+              dateRange={componentDateRanges.topDeniedDestinations}
+              onDateChange={(newRange) => handleComponentDateChange('topDeniedDestinations', newRange)}
+            >
               <div className="h-[320px]">
                 {dashboard.topDeniedDestinations.length === 0 ? (
                   <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
@@ -554,7 +628,11 @@ export default function PaloAltoPage() {
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#ef4444" radius={[0, 5, 5, 0]} />
+                      <Bar dataKey="value" fill="#ef4444" radius={[0, 5, 5, 0]} cursor="pointer"
+                        onClick={(entry) => goToDetail(
+                          matchRows(dashboard.topDeniedDestinationsRows, dashboard.topDeniedCols, entry.fullName),
+                          `Denied: ${entry.fullName}`, componentDateRanges.topDeniedDestinations,
+                        )} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -562,7 +640,12 @@ export default function PaloAltoPage() {
             </ChartCard>
 
             {/* Top Connections */}
-            <ChartCard title="Top Connections" subtitle="Most repeated firewall connections">
+            <ChartCard
+              title="Top Connections"
+              subtitle="Most repeated firewall connections"
+              dateRange={componentDateRanges.topConnections}
+              onDateChange={(newRange) => handleComponentDateChange('topConnections', newRange)}
+            >
               <div className="h-[320px]">
                 {dashboard.topConnections.length === 0 ? (
                   <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data in range</p></div>
@@ -573,7 +656,11 @@ export default function PaloAltoPage() {
                       <XAxis type="number" tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 11 }} />
                       <Tooltip />
-                      <Bar dataKey="value" fill="#10b981" radius={[0, 5, 5, 0]} />
+                      <Bar dataKey="value" fill="#10b981" radius={[0, 5, 5, 0]} cursor="pointer"
+                        onClick={(entry) => goToDetail(
+                          matchRows(dashboard.topConnectionsRows, dashboard.topConnectionsCols, entry.fullName),
+                          `Connections: ${entry.fullName}`, componentDateRanges.topConnections,
+                        )} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}

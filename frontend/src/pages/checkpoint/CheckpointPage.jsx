@@ -156,7 +156,16 @@ function ThreatCard({ label, summary, expanded, onToggle, activeTypes, onTypeCha
 
 // ── Detail Panel ─────────────────────────────────────────────────────────────
 
+// "new" on top, then "detected", everything else after — ties keep the
+// incoming (most-recent-first) order since Array.sort is stable.
+function eventStateRank(ev) {
+  if (ev.state === 'new') return 0;
+  if (ev.state === 'detected') return 1;
+  return 2;
+}
+
 function DetailPanel({ label, events }) {
+  const sortedEvents = [...events].sort((a, b) => eventStateRank(a) - eventStateRank(b));
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm mb-6">
       <div className="px-5 py-3.5 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
@@ -165,9 +174,9 @@ function DetailPanel({ label, events }) {
         </p>
       </div>
       <div className="divide-y divide-[var(--card-border)] max-h-96 overflow-y-auto">
-        {events.length === 0 ? (
+        {sortedEvents.length === 0 ? (
           <p className="px-5 py-6 text-sm text-[var(--muted)] text-center">No events to show.</p>
-        ) : events.map((ev, i) => {
+        ) : sortedEvents.map((ev, i) => {
           const isPending = ev.state === 'new' || ev.state === 'pending';
           return (
             <div key={ev.eventId || i} className={`flex items-start gap-3 px-5 py-2.5 transition-colors ${

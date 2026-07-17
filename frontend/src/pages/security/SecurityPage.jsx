@@ -39,7 +39,7 @@ export default function SecurityPage() {
 
       {/* Page header */}
       <div className="px-6 pt-6 pb-0">
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Security</h1>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">SentinelOne</h1>
         <p className="text-sm text-[var(--muted)] mt-1">SentinelOne endpoint protection — threats, CVEs, agents</p>
       </div>
 

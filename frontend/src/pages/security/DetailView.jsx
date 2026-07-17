@@ -22,16 +22,81 @@ function extractTechId(link) {
   return m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : null;
 }
 
+// Mirrors CheckpointPage.jsx's mapEvent() — DetailView fetches the same raw
+// endpoint directly rather than importing that page's local helper.
+function mapCheckpointEvent(e) {
+  return {
+    eventId: e.event_id,
+    type: e.type,
+    state: e.state,
+    severity: e.severity,
+    confidenceIndicator: e.confidence_indicator,
+    description: e.description,
+    senderAddress: e.sender_address,
+    saas: e.saas,
+    eventCreated: e.event_created,
+  };
+}
+
+const CHECKPOINT_EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
+
+// Mirrors PaloAltoPage.jsx's getFirstValue/DATE_COLS — the "firewall" dataset
+// below receives its rows pre-matched from that page (see its `raw` handling),
+// so this only needs to locate a date on each raw row for the date filter.
+function getFirstValue(row, cols, fallback = '-') {
+  for (const col of cols) {
+    const v = row?.[col];
+    if (v !== undefined && v !== null && v !== '') return v;
+  }
+  return fallback;
+}
+
+const FIREWALL_DATE_COLS = ['slabbed-receive_time', 'receive_time', 'time_generated', 'time', 'date', 'updatedAt'];
+const FIREWALL_COUNT_COLS = ['count', 'nrepeat', 'nsess', 'sessions', 'threats'];
+
+// Raw firewall report keys aren't always self-explanatory — override display
+// labels for known abbreviations while keeping the underlying key for lookup.
+const RAW_COL_LABELS = { nsess: 'Number of sessions' };
+
+// Raw firewall rows are pre-aggregated Panorama report entries (one row per
+// e.g. day+risk bucket, carrying a count/session field) rather than one row
+// per individual event — mirrors PaloAltoPage.jsx's getSumByColumn, so the
+// header can show the same "events" total the source dashboard summed.
+function sumFirewallCount(rows) {
+  const col = FIREWALL_COUNT_COLS.find((c) => rows.some((r) => r[c] !== undefined && r[c] !== null && r[c] !== ''));
+  if (!col) return null;
+  return rows.reduce((sum, r) => {
+    const n = Number(String(r[col] ?? '').replace(/,/g, '').replace(/[^\d.-]/g, '').trim());
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
+}
+
+// Shared row-tier styles, indexed by rank (0 = top/most severe). A dataset
+// opts in by providing `rowRank(row)` returning an index into `tierStyles`
+// (or omitting both for plain, unstyled rows).
+const RED_TIER = { className: 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50', coloredText: true };
+const ORANGE_TIER = { className: 'bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-950/50', coloredText: true };
+const NORMAL_TIER = { className: 'hover:bg-[var(--muted-bg)]/60', coloredText: false };
+
+// 4-step red→orange heat scale, darkest/most-severe first.
+const HEAT_DARK_RED   = { className: 'bg-red-200 dark:bg-red-900/60 text-red-900 dark:text-red-200 hover:bg-red-300 dark:hover:bg-red-900/80', coloredText: true };
+const HEAT_RED        = { className: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-950/60', coloredText: true };
+const HEAT_DARK_ORANGE = { className: 'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/60', coloredText: true };
+const HEAT_ORANGE     = { className: 'bg-orange-50 dark:bg-orange-950/30 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-950/50', coloredText: true };
+
 const DATASET_CONFIG = {
   threats: {
     endpoint: '/sentinelone/db/threats',
     extract: (r) => r.data?.data || r.data?.threats || [],
     dateField: (t) => t.threatInfo?.createdAt,
-    // Red/top-sorted only for genuinely outstanding threats — excludes benign-marked ones,
+    // Top/red only for genuinely outstanding threats — excludes benign-marked ones,
     // which otherwise have a non-'mitigated' status but aren't actually a problem.
-    isBad: (t) => t.threatInfo?.incidentStatus === 'unresolved'
-      && t.threatInfo?.mitigationStatus !== 'mitigated'
-      && t.threatInfo?.mitigationStatus !== 'marked_as_benign',
+    rowRank: (t) => (
+      t.threatInfo?.incidentStatus === 'unresolved'
+        && t.threatInfo?.mitigationStatus !== 'mitigated'
+        && t.threatInfo?.mitigationStatus !== 'marked_as_benign'
+    ) ? 0 : 1,
+    tierStyles: [RED_TIER, NORMAL_TIER],
     cols: ['Endpoint', 'Site', 'Group', 'User', 'Classification', 'Incident Status', 'Mitigation', 'Fileless', 'Confidence', 'Created At', 'Identified At'],
     rowFn: (t) => [
       t.agentRealtimeInfo?.agentComputerName,
@@ -83,6 +148,41 @@ const DATASET_CONFIG = {
       a.agentVersion,
     ],
   },
+  checkpoint: {
+    endpoint: '/harmony/events-db',
+    extract: (r) => (r.data?.events || r.data?.responseData || []).map(mapCheckpointEvent),
+    dateField: (e) => e.eventCreated,
+    // 4-step heat scale between "new" and "detected" states, each split by
+    // confidence — malicious confidence pushes a row to the darker shade
+    // within its state tier.
+    rowRank: (e) => {
+      const malicious = (e.confidenceIndicator || '').toLowerCase() === 'malicious';
+      if (e.state === 'new') return malicious ? 0 : 1;
+      if (e.state === 'detected') return malicious ? 2 : 3;
+      return 4;
+    },
+    tierStyles: [HEAT_DARK_RED, HEAT_RED, HEAT_DARK_ORANGE, HEAT_ORANGE, NORMAL_TIER],
+    cols: ['Type', 'State', 'Severity', 'Confidence', 'Sender', 'SaaS', 'Description', 'Date'],
+    rowFn: (e) => [
+      e.type,
+      e.state,
+      e.severity,
+      e.confidenceIndicator,
+      e.senderAddress,
+      e.saas,
+      e.description,
+      fmt(e.eventCreated),
+    ],
+  },
+  // PaloAltoPage.jsx has already fetched/matched the rows client-side (raw
+  // firewall report entries have wildly varying schemas per report type, so
+  // matching is easiest to do right where the chart data is built) — this
+  // dataset just renders whatever rows arrive via router state, with dynamic
+  // columns computed from whatever keys are actually present.
+  firewall: {
+    raw: true,
+    dateField: (row) => getFirstValue(row, FIREWALL_DATE_COLS, null),
+  },
 };
 
 const FILTERS = {
@@ -97,6 +197,21 @@ const FILTERS = {
     (ind.tactics || []).some((tac) => (tac.name || '').toLowerCase() === value.toLowerCase())),
   activeThreats:    (a) => (a.activeThreats || 0) > 0,
   agentDetail:      (a, value) => a.computerName === value,
+  criticalEvents:   (e) => Number(e.severity) >= 4,
+  checkpointSeverity: (e, value) => String(e.severity ?? '?') === value,
+  checkpointState:  (e, value) => (e.state ?? 'unknown') === value,
+  checkpointConfidence: (e, value) => (e.confidenceIndicator ?? 'unknown').toLowerCase() === value,
+  senderDomain:     (e, value) => {
+    const parts = (e.senderAddress || '').split('@');
+    return parts.length >= 2 && parts[parts.length - 1].toLowerCase() === value;
+  },
+  sender:           (e, value) => (e.senderAddress || '').toLowerCase() === value,
+  targetedMailbox:  (e, value) => {
+    const matches = (e.description || '').match(CHECKPOINT_EMAIL_RE);
+    if (!matches) return false;
+    const sender = (e.senderAddress || '').toLowerCase();
+    return matches.some((m) => { const lm = m.toLowerCase(); return lm === value && lm !== sender; });
+  },
 };
 
 export default function DetailView() {
@@ -112,16 +227,24 @@ export default function DetailView() {
   const [mitreDescriptions, setMitreDescriptions] = useState(null);
 
   const config = dataset ? DATASET_CONFIG[dataset] : null;
-  const filterFn = filterId ? FILTERS[filterId] : null;
+  const filterFn = filterId ? FILTERS[filterId] : (config?.raw ? () => true : null);
 
   useEffect(() => {
     if (!config) { setLoading(false); return; }
+    if (config.raw) {
+      // Rows already come pre-matched via router state (see PaloAltoPage.jsx)
+      // — re-run this whenever a fresh navigation lands here, not just when
+      // `dataset` itself changes, since the row set differs per click.
+      setRows(location.state?.rows || []);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     api.get(config.endpoint)
       .then((r) => setRows(config.extract(r)))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [dataset]);
+  }, [dataset, location.state]);
 
   useEffect(() => {
     if (!MITRE_FILTERS.has(filterId)) return;
@@ -130,7 +253,7 @@ export default function DetailView() {
       .catch(() => setMitreDescriptions({}));
   }, [filterId]);
 
-  useEffect(() => { setPage(1); }, [dateFrom, dateTo, filterId, value]);
+  useEffect(() => { setPage(1); }, [dateFrom, dateTo, filterId, value, location.state]);
 
   const dateValue = (r) => {
     const d = config?.dateField ? parseDate(config.dateField(r)) : null;
@@ -162,17 +285,30 @@ export default function DetailView() {
       didCap = true;
     }
 
-    if (config.isBad) {
+    if (config.rowRank) {
       result = [...result].sort((a, b) => {
-        const ab = config.isBad(a) ? 0 : 1;
-        const bb = config.isBad(b) ? 0 : 1;
-        if (ab !== bb) return ab - bb;
+        const ar = config.rowRank(a);
+        const br = config.rowRank(b);
+        if (ar !== br) return ar - br;
         return dateValue(b) - dateValue(a);
       });
     }
 
+    if (config.raw && result.some((r) => r.nsess !== undefined && r.nsess !== null && r.nsess !== '')) {
+      const nsessValue = (r) => {
+        const n = Number(String(r.nsess ?? '').replace(/,/g, '').trim());
+        return Number.isFinite(n) ? n : -Infinity;
+      };
+      result = [...result].sort((a, b) => nsessValue(b) - nsessValue(a));
+    }
+
     return { processedRows: result, capped: didCap, totalCount };
   }, [rows, filterFn, value, dateFrom, dateTo, hasDateFilter, filterId, config]);
+
+  const eventTotal = useMemo(
+    () => (config?.raw ? sumFirewallCount(processedRows) : null),
+    [config, processedRows]
+  );
 
   // Distinct techniques actually present in the filtered rows, for the
   // description panel — for a single-technique filter this is just that one
@@ -222,6 +358,15 @@ export default function DetailView() {
     );
   }
 
+  // Raw firewall rows have no fixed schema — derive columns from whatever
+  // keys are actually present across the matched rows.
+  const displayCols = config.raw
+    ? Array.from(new Set(rows.flatMap((r) => Object.keys(r))))
+    : config.cols;
+  const displayRowFn = config.raw
+    ? (row) => displayCols.map((c) => row[c])
+    : config.rowFn;
+
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-start justify-between flex-wrap gap-3">
@@ -234,7 +379,9 @@ export default function DetailView() {
           </button>
           <h1 className="text-xl font-bold text-[var(--foreground)]">{title || 'Details'}</h1>
           <p className="text-sm text-[var(--muted)] mt-0.5">
-            {totalCount} record{totalCount === 1 ? '' : 's'}
+            {totalCount} row{totalCount === 1 ? '' : 's'}
+            {typeof eventTotal === 'number' && eventTotal > totalCount &&
+              ` · ${eventTotal.toLocaleString('en-IN')} events (rows are pre-aggregated by the source report)`}
             {capped && ` · showing ${RECENT_CAP} most recent — apply a date filter to see more`}
           </p>
         </div>
@@ -293,18 +440,19 @@ export default function DetailView() {
               <table className="w-full text-xs">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-[var(--muted-bg)]">
-                    {config.cols.map((c) => (
-                      <th key={c} className="px-3 py-2 text-left font-semibold text-[var(--muted)] uppercase tracking-wide whitespace-nowrap border-b border-[var(--card-border)]">{c}</th>
+                    {displayCols.map((c) => (
+                      <th key={c} className="px-3 py-2 text-left font-semibold text-[var(--muted)] uppercase tracking-wide whitespace-nowrap border-b border-[var(--card-border)]">{config.raw ? (RAW_COL_LABELS[c] || c) : c}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--card-border)]">
                   {pageRows.map((row, i) => {
-                    const bad = config.isBad && config.isBad(row);
+                    const tier = config.rowRank && config.tierStyles ? config.tierStyles[config.rowRank(row)] : null;
+                    const rowClassName = tier ? tier.className : 'hover:bg-[var(--muted-bg)]/60';
                     return (
-                      <tr key={i} className={bad ? 'bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50' : 'hover:bg-[var(--muted-bg)]/60'}>
-                        {config.rowFn(row).map((cell, j) => (
-                          <td key={j} className={`px-3 py-2 whitespace-nowrap max-w-[220px] truncate ${bad ? '' : 'text-[var(--foreground)]'}`}>{cell ?? '—'}</td>
+                      <tr key={i} className={rowClassName}>
+                        {displayRowFn(row).map((cell, j) => (
+                          <td key={j} className={`px-3 py-2 whitespace-nowrap max-w-[220px] truncate ${tier?.coloredText ? '' : 'text-[var(--foreground)]'}`}>{cell ?? '—'}</td>
                         ))}
                       </tr>
                     );
