@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
+import { useProviders } from '../../context/ProviderContext.jsx';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
   ComposedChart, Line, PieChart, Pie,
@@ -277,6 +278,8 @@ function KpiDateFilter({ kpiDateRange, onKpiDateChange }) {
 
 export default function PaloAltoPage() {
   const navigate = useNavigate();
+  const { selectedProviders } = useProviders();
+  const activeTool = selectedProviders.firewall || 'Palo Alto';
   const [kpiDateRange, setKpiDateRange] = useState({ from: '', to: '' });
   const [componentDateRanges, setComponentDateRanges] = useState({
     riskTrend: { from: '', to: '' },
@@ -447,9 +450,9 @@ export default function PaloAltoPage() {
       {/* Header */}
       <div className="mb-6 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-2xl font-black text-[var(--foreground)]">Firewall SOC / NOC Dashboard</h1>
+          <h1 className="text-2xl font-black text-[var(--foreground)]">{activeTool} SOC / NOC Dashboard</h1>
           <p className="text-sm text-[var(--muted)]">
-            Palo Alto firewall reports · {formatNumber(allRows.length)} total rows
+            {activeTool} firewall reports · {formatNumber(allRows.length)} total rows
           </p>
         </div>
         <button

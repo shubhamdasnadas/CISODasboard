@@ -32,17 +32,13 @@ export default function FirewallConfig() {
       setStatus('syncing');
       setMsg('Collecting firewall reports…');
       const r = await api.post('/firewall/collect');
-      setMsg(`Done — ${r.data.success}/${r.data.total} reports saved.`);
+      setSelectedProvider('firewall', 'Palo Alto');
+      setMsg(`Done — ${r.data.success}/${r.data.total} reports saved. Palo Alto is now the active firewall.`);
       setStatus('done');
     } catch (err) {
       setMsg(err.response?.data?.message || 'Error');
       setStatus('error');
     }
-  };
-
-  const handleSet = () => {
-    setSelectedProvider('firewall', 'Palo Alto');
-    navigate('/settings');
   };
 
   const statusColor = (s) => ({
@@ -91,12 +87,6 @@ export default function FirewallConfig() {
                 <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{status === 'saving' ? 'Saving…' : 'Collecting…'}</>
               ) : 'Save & Collect'}
             </button>
-            {status === 'done' && (
-              <button onClick={handleSet}
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                Set as Active Firewall
-              </button>
-            )}
             {msg && <span className={`text-sm font-medium ${statusColor(status)}`}>{msg}</span>}
           </div>
         </div>

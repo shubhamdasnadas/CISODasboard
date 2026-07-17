@@ -39,17 +39,17 @@ export default function SentinelOneConfig() {
       setMsg('Syncing SentinelOne data…');
       const r = await api.post('/sentinelone/sync');
       const warnings = r.data.warnings?.length ? ` ⚠ ${r.data.warnings.join('; ')}` : '';
-      setMsg((r.data.message || 'Sync complete') + warnings);
+      if (!r.data.warnings?.length) {
+        setSelectedProvider('edr', 'SentinelOne');
+        setMsg((r.data.message || 'Sync complete') + ' — SentinelOne is now the active EDR.');
+      } else {
+        setMsg((r.data.message || 'Sync complete') + warnings);
+      }
       setStatus(r.data.warnings?.length ? 'error' : 'done');
     } catch (err) {
       setMsg(err.response?.data?.message || 'Error');
       setStatus('error');
     }
-  };
-
-  const handleSet = () => {
-    setSelectedProvider('edr', 'SentinelOne');
-    navigate('/settings');
   };
 
   const statusColor = (s) => ({
@@ -99,12 +99,6 @@ export default function SentinelOneConfig() {
                 <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{status === 'saving' ? 'Saving…' : 'Syncing…'}</>
               ) : 'Save & Sync'}
             </button>
-            {status === 'done' && (
-              <button onClick={handleSet}
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                Set as Active EDR
-              </button>
-            )}
             {msg && <span className={`text-sm font-medium ${statusColor(status)}`}>{msg}</span>}
           </div>
         </div>

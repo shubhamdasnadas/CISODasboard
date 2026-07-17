@@ -32,17 +32,13 @@ export default function HarmonyConfig() {
       setStatus('fetching');
       setMsg('Fetching & saving events…');
       const r = await api.post('/harmony/sync');
-      setMsg(`Sync complete — ${r.data.upserted} events saved (${r.data.totalInDb} total).`);
+      setSelectedProvider('emailSecurity', 'Check Point Harmony');
+      setMsg(`Sync complete — ${r.data.upserted} events saved (${r.data.totalInDb} total). Check Point Harmony is now the active email security tool.`);
       setStatus('done');
     } catch (err) {
       setMsg(err.response?.data?.message || 'Sync failed');
       setStatus('error');
     }
-  };
-
-  const handleSet = () => {
-    setSelectedProvider('emailSecurity', 'Check Point Harmony');
-    navigate('/settings');
   };
 
   const statusColor = (s) => ({
@@ -91,12 +87,6 @@ export default function HarmonyConfig() {
                 <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{status === 'auth' ? 'Authenticating…' : 'Syncing…'}</>
               ) : 'Save & Sync'}
             </button>
-            {status === 'done' && (
-              <button onClick={handleSet}
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                Set as Active Email Security
-              </button>
-            )}
             {msg && <span className={`text-sm font-medium ${statusColor(status)}`}>{msg}</span>}
           </div>
         </div>

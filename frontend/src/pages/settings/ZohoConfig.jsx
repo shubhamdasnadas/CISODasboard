@@ -47,17 +47,18 @@ export default function ZohoConfig() {
       setStatus('syncing');
       setMsg('Syncing Zoho tickets…');
       const r = await api.post('/zoho/credentials-sync');
-      setMsg(r.data.message || 'Sync complete');
-      setStatus(r.data.stale && !r.data.success ? 'error' : 'done');
+      const failed = r.data.stale && !r.data.success;
+      if (!failed) {
+        setSelectedProvider('ticketing', 'Zoho Desk');
+        setMsg((r.data.message || 'Sync complete') + ' — Zoho Desk is now the active ticketing tool.');
+      } else {
+        setMsg(r.data.message || 'Sync complete');
+      }
+      setStatus(failed ? 'error' : 'done');
     } catch (err) {
       setMsg(err.response?.data?.message || 'Sync failed');
       setStatus('error');
     }
-  };
-
-  const handleSet = () => {
-    setSelectedProvider('ticketing', 'Zoho Desk');
-    navigate('/settings');
   };
 
   const statusColor = (s) => ({
@@ -116,12 +117,6 @@ export default function ZohoConfig() {
                 <><div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />{status === 'saving' ? 'Saving…' : 'Syncing…'}</>
               ) : 'Save & Sync'}
             </button>
-            {status === 'done' && (
-              <button onClick={handleSet}
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold">
-                Set as Active Ticketing
-              </button>
-            )}
             {msg && <span className={`text-sm font-medium ${statusColor(status)}`}>{msg}</span>}
           </div>
         </div>

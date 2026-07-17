@@ -31,17 +31,13 @@ export default function CrowdStrikeConfig() {
       setStatus('syncing');
       setMsg('Syncing CrowdStrike data…');
       const r = await api.post('/crowdstrike/sync');
-      setMsg(r.data.message || 'Sync complete');
+      setSelectedProvider('edr', 'CrowdStrike');
+      setMsg((r.data.message || 'Sync complete') + ' — CrowdStrike is now the active EDR.');
       setStatus('done');
     } catch (err) {
       setMsg(err.response?.data?.message || 'Error');
       setStatus('error');
     }
-  };
-
-  const handleSet = () => {
-    setSelectedProvider('edr', 'CrowdStrike');
-    navigate('/settings');
   };
 
   const statusColor = (s) => ({
@@ -104,14 +100,6 @@ export default function CrowdStrikeConfig() {
                 </>
               ) : 'Save & Sync'}
             </button>
-            {status === 'done' && (
-              <button
-                onClick={handleSet}
-                className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold"
-              >
-                Set as Active EDR
-              </button>
-            )}
             {msg && <span className={`text-sm font-medium ${statusColor(status)}`}>{msg}</span>}
           </div>
         </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Threats from './Threats.jsx';
 import S1Cve from './S1Cve.jsx';
 import S1Agent from './S1Agent.jsx';
+import { useProviders } from '../../context/ProviderContext.jsx';
 
 const TABS = [
   {
@@ -33,14 +34,16 @@ const IDLE_CLS = 'text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-[v
 
 export default function SecurityPage() {
   const [activeTab, setActiveTab] = useState('threats');
+  const { selectedProviders } = useProviders();
+  const activeTool = selectedProviders.edr || 'SentinelOne';
 
   return (
     <div className="flex flex-col min-h-full">
 
       {/* Page header */}
       <div className="px-6 pt-6 pb-0">
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">SentinelOne</h1>
-        <p className="text-sm text-[var(--muted)] mt-1">SentinelOne endpoint protection — threats, CVEs, agents</p>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">{activeTool}</h1>
+        <p className="text-sm text-[var(--muted)] mt-1">{activeTool} endpoint protection — threats, CVEs, agents</p>
       </div>
 
       {/* Tab bar */}

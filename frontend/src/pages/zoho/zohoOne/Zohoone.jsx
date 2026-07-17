@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../../../api';
+import { useProviders } from '../../../context/ProviderContext.jsx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart, Pie, Legend } from 'recharts';
 import TicketVolcanoGraph from './TicketVolcanoGraph';
 import Circlemember from './Circlemember';
@@ -566,6 +567,8 @@ function MonthlyVolumeWidget({ tickets, loading }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function Zohoone() {
+  const { selectedProviders } = useProviders();
+  const activeTool = selectedProviders.ticketing || 'Zoho Desk';
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeDay, setActiveDay] = useState(null);
@@ -656,7 +659,7 @@ export default function Zohoone() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <p className="text-xs font-semibold text-indigo-500 uppercase tracking-widest mb-0.5">Support</p>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Zoho Desk</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">{activeTool}</h1>
           {lastSynced && !loading && (
             <p className="text-xs text-[var(--muted)] mt-0.5">
               Last synced {timeAgo(lastSynced)} &mdash; {tickets.length} tickets

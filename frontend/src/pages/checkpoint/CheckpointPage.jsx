@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../api';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CheckpointDashboard from './CheckpointDashboard';
+import { useProviders } from '../../context/ProviderContext.jsx';
 
 const ALL_EVENT_TYPES = ['phishing','malware','suspicious_malware','suspicious_phishing','dlp'];
 
@@ -232,6 +233,8 @@ function EventModal({ event, onClose }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CheckpointPage() {
+  const { selectedProviders } = useProviders();
+  const activeTool = selectedProviders.emailSecurity || 'Check Point Harmony';
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -352,7 +355,7 @@ export default function CheckpointPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Check Point Harmony</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">{activeTool}</h1>
           <p className="text-sm text-[var(--muted)] mt-1">
             {lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}` : 'Email & Collaboration security events'}
           </p>
