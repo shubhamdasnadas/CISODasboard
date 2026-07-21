@@ -29,6 +29,9 @@ export default function Settings() {
       { name: 'Zoho Desk', path: '/settings/zoho', icon: '🎫', color: 'red' },
       { name: 'ServiceNow', path: '/settings/servicenow', icon: '💼', color: 'green' },
     ],
+    identity: [
+      { name: 'Microsoft', path: '/settings/microsoft', icon: '🪟', color: 'blue' },
+    ],
   };
 
   // Sync All functionality
@@ -358,6 +361,26 @@ export default function Settings() {
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.ticketing.map((provider) => renderProviderCard(provider, 'ticketing'))}</div>
+              </div>
+            </div>
+
+            {/* Identity / Directory Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">Identity & Directory</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure identity provider integration</p>
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.identity.map((provider) => renderProviderCard(provider, 'identity'))}</div>
               </div>
             </div>
           </>

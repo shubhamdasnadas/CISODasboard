@@ -23,6 +23,19 @@ async function applySchemaPatches(orgPool, slug) {
   await orgPool.query(
     'ALTER TABLE s1_agents ADD COLUMN IF NOT EXISTS removed_at TIMESTAMPTZ'
   );
+  // Ensure all Microsoft tables exist (idempotent)
+  const msTables = [
+    'ms_organization','ms_subscribed_skus','ms_domains','ms_users',
+    'ms_audit_sign_ins','ms_audit_directory','ms_audit_provisioning',
+    'ms_risky_users','ms_risk_detections','ms_risky_service_principals',
+    'ms_security_incidents','ms_security_alerts','ms_secure_scores',
+    'ms_secure_score_profiles','ms_managed_devices','ms_compliance_policies',
+    'ms_device_configurations','ms_applications','ms_service_principals',
+    'ms_service_health','ms_service_issues',
+  ];
+  for (const t of msTables) {
+    await orgPool.query(`CREATE TABLE IF NOT EXISTS ${t} (id SERIAL PRIMARY KEY, data JSONB NOT NULL DEFAULT '{}', synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  }
   console.log(`✔  ciso_org_${slug}: schema patches applied`);
 }
 

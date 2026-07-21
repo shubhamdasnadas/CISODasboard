@@ -34,6 +34,7 @@ import CrowdStrikeConfig from './pages/settings/CrowdStrikeConfig.jsx';
 import MimecastConfig from './pages/settings/MimecastConfig.jsx';
 import FortinetConfig from './pages/settings/FortinetConfig.jsx';
 import ServiceNowConfig from './pages/settings/ServiceNowConfig.jsx';
+import MicrosoftConfig from './pages/settings/MicrosoftConfig.jsx';
 
 // Integrations
 import PaloAltoPage from './pages/paloalto/PaloAltoPage.jsx';
@@ -157,6 +158,7 @@ export default function App() {
                 <Route path="/settings/fortinet" element={<FortinetConfig />} />
                 <Route path="/settings/zoho" element={<ZohoConfig />} />
                 <Route path="/settings/servicenow" element={<ServiceNowConfig />} />
+                <Route path="/settings/microsoft" element={<MicrosoftConfig />} />
               </Route>
 
               <Route path="/" element={<Navigate to="/dashboard" replace />} />

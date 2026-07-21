@@ -240,3 +240,112 @@ CREATE TABLE IF NOT EXISTS news_articles (
   fetched_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(query_term, url)
 );
+
+-- ============================================================
+-- Microsoft Graph API tables (one per endpoint)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ms_organization (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_subscribed_skus (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_domains (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_users (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_audit_sign_ins (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_audit_directory (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_audit_provisioning (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_risky_users (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_risk_detections (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_risky_service_principals (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_security_incidents (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_security_alerts (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_secure_scores (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_secure_score_profiles (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_managed_devices (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_compliance_policies (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_device_configurations (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_applications (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_service_principals (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_service_health (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS ms_service_issues (
+  id        SERIAL PRIMARY KEY,
+  data      JSONB NOT NULL DEFAULT '{}',
+  synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
