@@ -8,7 +8,11 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
+<<<<<<< HEAD
         target: 'http://0.0.0.0:5000', // your actual backend port
+=======
+        target: 'http://localhost:3001', // your actual backend port
+>>>>>>> 3c195bf (MDM page)
         changeOrigin: true,
       },
     },

@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { syncSentinelOne } = require('../services/sentinelone');
+const { syncHexnode } = require('../services/hexnode');
 const { syncFirewall } = require('../services/firewall');
 const { syncHarmony } = require('../services/harmony');
 
@@ -22,6 +23,13 @@ router.post('/all', async (req, res) => {
         results.sentinelone = await syncSentinelOne(orgId, creds.sentinelone);
       } catch (e) {
         results.sentinelone = { error: e.message };
+      }
+    }
+    if (creds.hexnode) {
+      try {
+        results.hexnode = await syncHexnode(orgId, creds.hexnode);
+      } catch (e) {
+        results.hexnode = { error: e.message };
       }
     }
     if (creds.firewall) {
@@ -72,6 +80,7 @@ router.post('/cron', async (req, res) => {
           credsRows.forEach(r => { creds[r.integration] = r.credentials; });
 
           if (creds.sentinelone) await syncSentinelOne(orgSlug, creds.sentinelone).catch(console.error);
+          if (creds.hexnode) await syncHexnode(orgSlug, creds.hexnode).catch(console.error);
           if (creds.firewall) await syncFirewall(orgSlug, creds.firewall).catch(console.error);
           if (creds.harmony) await syncHarmony(orgSlug, creds.harmony).catch(console.error);
         } catch (e) {

@@ -17,6 +17,9 @@ export default function Settings() {
       { name: 'SentinelOne', path: '/settings/sentinelone', icon: '🛡️', color: 'emerald' },
       { name: 'CrowdStrike', path: '/settings/crowdstrike', icon: '🔒', color: 'purple' },
     ],
+    deviceManagement: [
+      { name: 'Hexnode', path: '/settings/hexnode', icon: '📱', color: 'blue' },
+    ],
     emailSecurity: [
       { name: 'Check Point Harmony', path: '/settings/harmony', icon: '✅', color: 'indigo' },
       { name: 'Mimecast', path: '/settings/mimecast', icon: '📧', color: 'blue' },
@@ -284,6 +287,31 @@ export default function Settings() {
               </div>
               <div className="p-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.edr.map((provider) => renderProviderCard(provider, 'edr'))}</div>
+              </div>
+            </div>
+
+            {/* Device Management Section */}
+            <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[var(--card-border)] bg-[var(--muted-bg)] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[var(--foreground)]">{selectedProviders.deviceManagement || 'Device Management (MDM)'}</h3>
+                    <p className="text-xs text-[var(--muted)] mt-0.5">Configure mobile device management integration</p>
+                  </div>
+                </div>
+                {selectedProviders.deviceManagement && (
+                  <span className="text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full font-medium">
+                    Active: {selectedProviders.deviceManagement}
+                  </span>
+                )}
+              </div>
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">{providers.deviceManagement.map((provider) => renderProviderCard(provider, 'deviceManagement'))}</div>
               </div>
             </div>
 

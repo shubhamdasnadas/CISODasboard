@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const ProviderContext = createContext({
-  selectedProviders: { edr: null, firewall: null, emailSecurity: null, ticketing: null },
+  selectedProviders: { edr: null, firewall: null, emailSecurity: null, ticketing: null, deviceManagement: null },
   setSelectedProvider: () => {},
   loading: true,
 });
@@ -10,7 +10,7 @@ const STORAGE_KEY = 'ciso_selected_providers_v2';
 
 export function ProviderProvider({ children }) {
   const [selectedProviders, setSelectedProvidersState] = useState({
-    edr: null, firewall: null, emailSecurity: null, ticketing: null
+    edr: null, firewall: null, emailSecurity: null, ticketing: null, deviceManagement: null
   });
   const [loading, setLoading] = useState(true);
 

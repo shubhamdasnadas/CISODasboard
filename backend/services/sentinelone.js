@@ -102,7 +102,8 @@ async function syncSentinelOne(orgSlug, creds) {
   let installedApps = [];
   let installedAppsError = null;
   try {
-    installedApps = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/application-management/installed-apps');
+    const installedAppsParams = creds.accountId ? { accountIds: creds.accountId } : {};
+    installedApps = await fetchAllPages(baseUrl, apiToken, '/web/api/v2.1/installed-applications', installedAppsParams);
     console.log(`[S1 sync][org=${orgSlug}] Got ${installedApps.length} installed app records`);
     if (installedApps.length > 0) {
       await pool.query('TRUNCATE TABLE s1_application_agent');

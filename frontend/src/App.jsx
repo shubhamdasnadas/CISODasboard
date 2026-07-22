@@ -8,6 +8,7 @@ import { ProviderProvider } from './context/ProviderContext.jsx';
 import Login from './pages/Login.jsx';
 import SelectOrganisation from './pages/SelectOrganisation.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import MDM from './pages/MDM.jsx';
 import Organisations from './pages/Organisations.jsx';
 import Users from './pages/Users.jsx';
 import ApiTokens from './pages/ApiTokens.jsx';
@@ -27,6 +28,7 @@ import DetailView from './pages/security/DetailView.jsx';
 
 // Provider Config Pages
 import SentinelOneConfig from './pages/settings/SentinelOneConfig.jsx';
+import HexnodeConfig from './pages/settings/HexnodeConfig.jsx';
 import HarmonyConfig from './pages/settings/HarmonyConfig.jsx';
 import FirewallConfig from './pages/settings/FirewallConfig.jsx';
 import ZohoConfig from './pages/settings/ZohoConfig.jsx';
@@ -111,6 +113,7 @@ export default function App() {
               >
                 {/* Core */}
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/mdm" element={<MDM />} />
                 <Route path="/organisations" element={<Organisations />} />
                 <Route path="/tokens" element={<ApiTokens />} />
                 <Route path="/responses" element={<ApiResponses />} />
@@ -151,6 +154,7 @@ export default function App() {
 
                 {/* Provider Config Pages */}
                 <Route path="/settings/sentinelone" element={<SentinelOneConfig />} />
+                <Route path="/settings/hexnode" element={<HexnodeConfig />} />
                 <Route path="/settings/crowdstrike" element={<CrowdStrikeConfig />} />
                 <Route path="/settings/harmony" element={<HarmonyConfig />} />
                 <Route path="/settings/mimecast" element={<MimecastConfig />} />
