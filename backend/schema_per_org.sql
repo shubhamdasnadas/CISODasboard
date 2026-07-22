@@ -9,7 +9,7 @@
 -- Use CREATE TABLE IF NOT EXISTS, never DROP.
 -- ============================================================
 
--- API tokens configured for this organisation.
+-- API tokens configured for this organisation.00
 -- Preserves tokens added via the UI across server restarts.
 CREATE TABLE IF NOT EXISTS api_tokens (
   id SERIAL PRIMARY KEY,

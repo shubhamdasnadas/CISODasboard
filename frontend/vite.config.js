@@ -8,10 +8,10 @@ export default defineConfig({
     host: true,
     proxy: {
       '/api': {
-        target: 'http://10.134.243.128:5000', // your actual backend port
+        target: 'http://0.0.0.0:5000', // your actual backend port
         changeOrigin: true,
       },
     },
-    host: true,
+
   },
 });
