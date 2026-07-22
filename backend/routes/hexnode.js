@@ -78,6 +78,20 @@ router.get('/db/applications', async (req, res) => {
   }
 });
 
+// GET /api/hexnode/db/device-applications/flagged — installed apps marked black_listed or mandatory_app, across all devices
+router.get('/db/device-applications/flagged', async (req, res) => {
+  try {
+    const { rows } = await req.orgPool.query(
+      `SELECT device_id, data FROM hexnode_device_applications
+       WHERE (data->>'black_listed')::boolean = true OR (data->>'mandatory_app')::boolean = true
+       ORDER BY synced_at DESC`
+    );
+    res.json({ data: rows.map(r => ({ deviceId: r.device_id, ...r.data })) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // GET /api/hexnode/db/device-applications?deviceId=<id>
 router.get('/db/device-applications', async (req, res) => {
   try {
