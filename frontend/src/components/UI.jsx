@@ -68,6 +68,7 @@ export function Badge({ children, color = 'accent' }) {
     accent: 'bg-accent/20 text-accent border border-accent/40',
     green:  'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
     red:    'bg-rose-500/20 text-rose-300 border border-rose-500/40',
+    amber:  'bg-amber-500/20 text-amber-300 border border-amber-500/40',
     gray:   'bg-navy-700 text-muted border border-navy-700',
   };
   return (

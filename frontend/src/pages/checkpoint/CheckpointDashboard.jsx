@@ -1,4 +1,5 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   PieChart, Pie, Cell,
   BarChart, Bar, LabelList,
@@ -9,6 +10,12 @@ import {
 
 const dateFmt = (d) => d.toISOString().slice(0, 10);
 
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 const TOOLTIP_STYLE = {
   background: 'var(--card-bg)',
   border: '1px solid var(--card-border)',
@@ -16,9 +23,12 @@ const TOOLTIP_STYLE = {
   fontSize: 12,
 };
 
-function WidgetCard({ title, children }) {
+function WidgetCard({ title, children, onClick }) {
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
+    <div
+      onClick={onClick}
+      className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+    >
       <div className="px-5 py-3.5 border-b border-[var(--card-border)]">
         <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
       </div>
@@ -34,11 +44,22 @@ function EmptyState() {
 // Widget 1: Severity Distribution
 const SEV_COLORS = ['#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'];
 
-function SeverityDonut({ events }) {
+// Standard CVSS-style qualitative severity scale (0-4)
+const SEV_LABELS = {
+  0: 'Informational',
+  1: 'Low',
+  2: 'Medium',
+  3: 'High',
+  4: 'Critical',
+};
+
+function SeverityDonut({ events, goToDetail }) {
   const { data, total } = useMemo(() => {
     const counts = {};
     events.forEach(e => { const s = e.severity ?? '?'; counts[s] = (counts[s] || 0) + 1; });
-    const data = Object.entries(counts).sort(([a],[b]) => Number(a)-Number(b)).map(([sev,value]) => ({ name: `Sev ${sev}`, value }));
+    const data = Object.entries(counts)
+      .sort(([a],[b]) => Number(a)-Number(b))
+      .map(([sev,value]) => ({ name: SEV_LABELS[sev] ?? `Sev ${sev}`, code: sev, value }));
     return { data, total: data.reduce((s,d) => s+d.value, 0) };
   }, [events]);
   if (total === 0) return <WidgetCard title="Severity Distribution"><EmptyState /></WidgetCard>;
@@ -46,7 +67,8 @@ function SeverityDonut({ events }) {
     <WidgetCard title="Severity Distribution">
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
+          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value" cursor="pointer"
+            onClick={(d) => goToDetail('checkpointSeverity', d.code, `${d.name} Severity Events`)}>
             {data.map((_,i) => <Cell key={i} fill={SEV_COLORS[i % SEV_COLORS.length]} />)}
           </Pie>
           <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
@@ -60,7 +82,7 @@ function SeverityDonut({ events }) {
 // Widget 2: Event State Breakdown
 const STATE_COLORS = { new:'#ef4444', pending:'#f97316', detected:'#f59e0b', remediated:'#22c55e', closed:'#3b82f6', done:'#10b981' };
 
-function StateDonut({ events }) {
+function StateDonut({ events, goToDetail }) {
   const { data, total } = useMemo(() => {
     const counts = {};
     events.forEach(e => { const s = e.state ?? 'unknown'; counts[s] = (counts[s]||0)+1; });
@@ -72,7 +94,8 @@ function StateDonut({ events }) {
     <WidgetCard title="Event State Breakdown">
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
+          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value" cursor="pointer"
+            onClick={(d) => goToDetail('checkpointState', d.name, `"${d.name}" State Events`)}>
             {data.map((d,i) => <Cell key={i} fill={STATE_COLORS[d.name] ?? '#6366f1'} />)}
           </Pie>
           <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
@@ -84,7 +107,7 @@ function StateDonut({ events }) {
 }
 
 // Widget 3: Top Sender Domains
-function TopSenderDomains({ events }) {
+function TopSenderDomains({ events, goToDetail }) {
   const data = useMemo(() => {
     const counts = {};
     events.forEach(e => {
@@ -105,7 +128,8 @@ function TopSenderDomains({ events }) {
           <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={110} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]}>
+          <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]} cursor="pointer"
+            onClick={(d) => goToDetail('senderDomain', d.name, `Events from ${d.name}`)}>
             <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
           </Bar>
         </BarChart>
@@ -115,7 +139,7 @@ function TopSenderDomains({ events }) {
 }
 
 // Widget 4: Top Individual Senders
-function TopSenders({ events }) {
+function TopSenders({ events, goToDetail }) {
   const data = useMemo(() => {
     const counts = {};
     events.forEach(e => {
@@ -134,7 +158,8 @@ function TopSenders({ events }) {
           <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={140} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Bar dataKey="count" name="Events" fill="#f97316" radius={[0,4,4,0]}>
+          <Bar dataKey="count" name="Events" fill="#f97316" radius={[0,4,4,0]} cursor="pointer"
+            onClick={(d) => goToDetail('sender', d.name, `Events from ${d.name}`)}>
             <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
           </Bar>
         </BarChart>
@@ -146,7 +171,7 @@ function TopSenders({ events }) {
 // Widget 5: Confidence Indicator
 const CONF_COLORS = { malicious:'#ef4444', suspicious:'#f97316', detected:'#f59e0b', unknown:'#94a3b8' };
 
-function ConfidenceDonut({ events }) {
+function ConfidenceDonut({ events, goToDetail }) {
   const { data, total } = useMemo(() => {
     const counts = {};
     events.forEach(e => { const c = (e.confidenceIndicator ?? 'unknown').toLowerCase(); counts[c] = (counts[c]||0)+1; });
@@ -158,7 +183,8 @@ function ConfidenceDonut({ events }) {
     <WidgetCard title="Confidence Indicator">
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value">
+          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2} dataKey="value" cursor="pointer"
+            onClick={(d) => goToDetail('checkpointConfidence', d.name, `"${d.name}" Confidence Events`)}>
             {data.map((d,i) => <Cell key={i} fill={CONF_COLORS[d.name] ?? '#6366f1'} />)}
           </Pie>
           <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
@@ -172,7 +198,7 @@ function ConfidenceDonut({ events }) {
 // Widget 6: Most Targeted Mailboxes
 const EMAIL_RE = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g;
 
-function TopTargetedMailboxes({ events }) {
+function TopTargetedMailboxes({ events, goToDetail }) {
   const data = useMemo(() => {
     const counts = {};
     events.forEach(e => {
@@ -193,7 +219,8 @@ function TopTargetedMailboxes({ events }) {
           <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
           <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={140} />
           <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Bar dataKey="count" name="Events" fill="#8b5cf6" radius={[0,4,4,0]}>
+          <Bar dataKey="count" name="Events" fill="#8b5cf6" radius={[0,4,4,0]} cursor="pointer"
+            onClick={(d) => goToDetail('targetedMailbox', d.name, `Events targeting ${d.name}`)}>
             <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
           </Bar>
         </BarChart>
@@ -216,7 +243,7 @@ function CumulativeTimeline({ events }) {
   if (data.length === 0) return <WidgetCard title="Cumulative Events Over Time"><EmptyState /></WidgetCard>;
   return (
     <WidgetCard title="Cumulative Events Over Time">
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={350}>
         <LineChart data={data} margin={{ top:4, right:8, left:-16, bottom:0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" vertical={false} />
           <XAxis dataKey="date" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
@@ -280,10 +307,10 @@ function AvgSeverity({ events }) {
 }
 
 // Widget 10: Critical Events
-function CriticalEvents({ events }) {
+function CriticalEvents({ events, goToDetail }) {
   const count = useMemo(() => events.filter(e => Number(e.severity) >= 4).length, [events]);
   return (
-    <WidgetCard title="Critical Events">
+    <WidgetCard title="Critical Events" onClick={() => goToDetail('criticalEvents', null, 'Critical Events')}>
       <div className="flex flex-col items-center justify-center py-5 gap-1">
         <p className="text-5xl font-bold text-red-500">{count}</p>
         <p className="text-sm text-[var(--muted)]">severity ≥ 4</p>
@@ -303,36 +330,36 @@ function SaasPlatformChart({ events }) {
   }, [events]);
   if (data.length === 0) return <WidgetCard title="SaaS Platform Distribution"><EmptyState /></WidgetCard>;
   const total = data.reduce((s,d) => s+d.count, 0);
-  if (data.length <= 6) {
-    return (
-      <WidgetCard title="SaaS Platform Distribution">
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
-              {data.map((_,i) => <Cell key={i} fill={SAAS_COLORS[i % SAAS_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
-            <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </WidgetCard>
-    );
-  }
-  return (
-    <WidgetCard title="SaaS Platform Distribution">
-      <ResponsiveContainer width="100%" height={Math.max(200, data.length*32+40)}>
-        <BarChart data={data} layout="vertical" margin={{ top:4, right:48, left:8, bottom:4 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" horizontal={false} />
-          <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={100} />
-          <Tooltip contentStyle={TOOLTIP_STYLE} />
-          <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]}>
-            <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </WidgetCard>
-  );
+  // if (data.length <= 6) {
+  //   return (
+  //     <WidgetCard title="SaaS Platform Distribution">
+  //       <ResponsiveContainer width="100%" height={220}>
+  //         <PieChart>
+  //           <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={2}>
+  //             {data.map((_,i) => <Cell key={i} fill={SAAS_COLORS[i % SAAS_COLORS.length]} />)}
+  //           </Pie>
+  //           <Tooltip formatter={(v) => { const n = Number(v); return [`${n} (${Math.round((n/total)*100)}%)`, '']; }} contentStyle={TOOLTIP_STYLE} />
+  //           <Legend iconSize={10} wrapperStyle={{ fontSize: 11 }} />
+  //         </PieChart>
+  //       </ResponsiveContainer>
+  //     </WidgetCard>
+  //   );
+  // }
+  // return (
+  //   <WidgetCard title="SaaS Platform Distribution">
+  //     <ResponsiveContainer width="100%" height={Math.max(200, data.length*32+40)}>
+  //       <BarChart data={data} layout="vertical" margin={{ top:4, right:48, left:8, bottom:4 }}>
+  //         <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" horizontal={false} />
+  //         <XAxis type="number" tick={{ fontSize:10, fill:'var(--muted)' }} tickLine={false} axisLine={false} allowDecimals={false} />
+  //         <YAxis type="category" dataKey="name" tick={{ fontSize:10, fill:'var(--foreground)' }} tickLine={false} axisLine={false} width={100} />
+  //         <Tooltip contentStyle={TOOLTIP_STYLE} />
+  //         <Bar dataKey="count" name="Events" fill="#6366f1" radius={[0,4,4,0]}>
+  //           <LabelList dataKey="count" position="right" style={{ fontSize:10, fill:'var(--muted)' }} />
+  //         </Bar>
+  //       </BarChart>
+  //     </ResponsiveContainer>
+  //   </WidgetCard>
+  // );
 }
 
 // Widget 12: Remediation Rate Over Time
@@ -367,42 +394,84 @@ function RemediationRateChart({ events }) {
 
 // ── Main export ────────────────────────────────────────────────────────────────
 export default function CheckpointDashboard({ events }) {
+  const navigate = useNavigate();
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
+  const hasDateFilter = !!(dateFrom || dateTo);
+
+  const goToDetail = (filterId, value, title) => navigate('/security/detail', {
+    state: { dataset: 'checkpoint', filterId, value, title, dateFrom, dateTo },
+  });
+
+  const filteredEvents = useMemo(() => {
+    if (!events) return [];
+    if (!hasDateFilter) return events;
+    return events.filter((e) => {
+      const d = parseDate(e.eventCreated);
+      if (!d) return false;
+      const key = dateFmt(d);
+      if (dateFrom && key < dateFrom) return false;
+      if (dateTo   && key > dateTo)   return false;
+      return true;
+    });
+  }, [events, dateFrom, dateTo, hasDateFilter]);
+
   if (!events || events.length === 0) return null;
 
   return (
     <section className="mt-6 space-y-4">
-      <h2 className="text-base font-semibold text-[var(--foreground)]">Analytics Overview</h2>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">Analytics Overview</h2>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {hasDateFilter && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
+        </div>
+      </div>
 
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <WeekOverWeek events={events} />
-        <AvgSeverity events={events} />
-        <CriticalEvents events={events} />
+        <WeekOverWeek events={filteredEvents} />
+        <AvgSeverity events={filteredEvents} />
+        <CriticalEvents events={filteredEvents} goToDetail={goToDetail} />
       </div>
 
       {/* Donut charts */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <SeverityDonut events={events} />
-        <StateDonut events={events} />
-        <ConfidenceDonut events={events} />
+        <SeverityDonut events={filteredEvents} goToDetail={goToDetail} />
+        <StateDonut events={filteredEvents} goToDetail={goToDetail} />
+        <ConfidenceDonut events={filteredEvents} goToDetail={goToDetail} />
       </div>
 
       {/* Sender analysis */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TopSenderDomains events={events} />
-        <TopSenders events={events} />
+        <TopSenderDomains events={filteredEvents} goToDetail={goToDetail} />
+        <TopSenders events={filteredEvents} goToDetail={goToDetail} />
       </div>
 
       {/* Target + cumulative */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <TopTargetedMailboxes events={events} />
-        <CumulativeTimeline events={events} />
+        <TopTargetedMailboxes events={filteredEvents} goToDetail={goToDetail} />
+        <CumulativeTimeline events={filteredEvents} />
       </div>
 
       {/* Platform + remediation */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <SaasPlatformChart events={events} />
-        <RemediationRateChart events={events} />
+        <SaasPlatformChart events={filteredEvents} />
+        <RemediationRateChart events={filteredEvents} />
       </div>
     </section>
   );

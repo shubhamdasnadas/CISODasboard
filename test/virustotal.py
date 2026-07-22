@@ -12,8 +12,8 @@ import requests
 
 from _common import print_header, print_result, print_error, print_footer
 
-API_KEY = "YOUR_VIRUSTOTAL_API_KEY"
-DOMAIN = "example.com"  # sample domain to look up
+API_KEY = "45a143713480b19174562ec1d38dc34496097ab05e885fafb9a8539d9bf0028b"
+DOMAIN = "youtube.com"  # sample domain to look up
 URL = f"https://www.virustotal.com/api/v3/domains/{DOMAIN}"
 
 

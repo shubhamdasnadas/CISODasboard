@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -12,7 +13,13 @@ function shortName(v) {
   return v?.length > 18 ? v.slice(0, 18) + '...' : (v || '');
 }
 
-function StatCard({ title, value, color }) {
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function StatCard({ title, value, color, onClick }) {
   const cls = {
     default: 'text-[var(--foreground)]',
     red:     'text-red-500',
@@ -22,7 +29,10 @@ function StatCard({ title, value, color }) {
     green:   'text-green-500',
   };
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 shadow-sm">
+    <div
+      onClick={onClick}
+      className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+    >
       <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-widest mb-1">{title}</p>
       <p className={`text-3xl font-bold ${cls[color] || cls.default}`}>{value}</p>
     </div>
@@ -62,9 +72,12 @@ function CustomRiskTooltip({ active, payload }) {
 }
 
 export default function S1Cve() {
+  const navigate = useNavigate();
   const [apps, setApps]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [lastSync, setLastSync] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
 
   useEffect(() => {
     api.get('/sentinelone/db/application-cve')
@@ -76,11 +89,28 @@ export default function S1Cve() {
       .finally(() => setLoading(false));
   }, []);
 
+  const hasDateFilter = !!(dateFrom || dateTo);
+
+  const goToDetail = (state) => navigate('/security/detail', { state: { ...state, dateFrom, dateTo } });
+
+  const filteredApps = useMemo(() => {
+    if (!hasDateFilter) return apps;
+    return apps.filter((r) => {
+      const d = parseDate(r.detectionDate);
+      if (!d) return false;
+      const key = d.toISOString().slice(0, 10);
+      if (dateFrom && key < dateFrom) return false;
+      if (dateTo && key > dateTo) return false;
+      return true;
+    });
+  }, [apps, dateFrom, dateTo, hasDateFilter]);
+
   const dashboardData = useMemo(() => {
     // Raw records: one row per CVE per endpoint
     // Fields: cveId, applicationName, applicationVendor, severity, baseScore,
     //         daysDetected, endpointName, endpointId, detectionDate, status
 
+    const apps = filteredApps;
     const sc = (r) => parseFloat(r.baseScore) || 0;
 
     // Aggregate per application
@@ -193,7 +223,7 @@ export default function S1Cve() {
       severityMap, severityDistribution, topRiskyApps,
       cveAging, endpointImpact, scoreRange, vendorRisk, estimateStatus, criticalApps,
     };
-  }, [apps]);
+  }, [filteredApps]);
 
   if (loading) {
     return (
@@ -228,18 +258,49 @@ export default function S1Cve() {
           <h1 className="text-xl font-bold text-[var(--foreground)]">Application CVE Analytics</h1>
           <p className="text-sm text-[var(--muted)] mt-0.5">
             {totalApplications} applications · {totalCves} CVE records
+            {hasDateFilter && ` (filtered by detection date)`}
             {lastSync && <span> · Last sync: {new Date(lastSync).toLocaleString()}</span>}
           </p>
         </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {hasDateFilter && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
+        </div>
       </div>
+
+      {filteredApps.length === 0 ? (
+        <div className="p-6 flex flex-col items-center justify-center text-center bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl">
+          <p className="text-sm font-semibold text-[var(--foreground)]">No CVEs detected in the selected date range</p>
+          <p className="text-xs text-[var(--muted)] mt-1">Try widening the From/To filter above.</p>
+        </div>
+      ) : (
+      <>
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3">
         <StatCard title="Applications"  value={totalApplications}         color="default" />
         <StatCard title="Total CVEs"    value={totalCves}                 color="default" />
-        <StatCard title="Critical Apps" value={severityMap.CRITICAL}      color="purple" />
-        <StatCard title="High Apps"     value={severityMap.HIGH}          color="red" />
-        <StatCard title="Medium Apps"   value={severityMap.MEDIUM}        color="yellow" />
+        <StatCard title="Critical Severity Apps" value={severityMap.CRITICAL}      color="red"
+          onClick={() => goToDetail({ dataset: 'cve', filterId: 'severity', value: 'CRITICAL', title: 'Critical Severity CVEs' })} />
+        <StatCard title="High Severity Apps"     value={severityMap.HIGH}          color="red"
+          onClick={() => goToDetail({ dataset: 'cve', filterId: 'severity', value: 'HIGH', title: 'High Severity CVEs' })} />
+        <StatCard title="Medium Severity Apps"   value={severityMap.MEDIUM}        color="yellow"
+          onClick={() => goToDetail({ dataset: 'cve', filterId: 'severity', value: 'MEDIUM', title: 'Medium Severity CVEs' })} />
         <StatCard title="Endpoints"     value={totalEndpoints}            color="blue" />
         <StatCard title="Avg Score"     value={avgScore}                  color="default" />
       </div>
@@ -252,7 +313,8 @@ export default function S1Cve() {
           <div style={{ height: 280 }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={severityDistribution} innerRadius={65} outerRadius={95} dataKey="value" paddingAngle={3}>
+                <Pie data={severityDistribution} innerRadius={65} outerRadius={95} dataKey="value" paddingAngle={3} cursor="pointer"
+                  onClick={(data) => goToDetail({ dataset: 'cve', filterId: 'severity', value: data.name, title: `${data.name} Severity CVEs` })}>
                   {severityDistribution.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />
@@ -286,7 +348,8 @@ export default function S1Cve() {
                 <XAxis dataKey="name" tick={{ fontSize: 9, fill: 'var(--muted)' }} angle={-25} textAnchor="end" />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
                 <Tooltip content={<CustomRiskTooltip />} />
-                <Bar dataKey="cves" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={30} name="CVEs" />
+                <Bar dataKey="cves" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={30} name="CVEs" cursor="pointer"
+                  onClick={(data) => goToDetail({ dataset: 'cve', filterId: 'topRiskyApp', value: data.fullName, title: `CVEs for ${data.fullName}` })} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -360,6 +423,9 @@ export default function S1Cve() {
             ))}
           </div>
         </div>
+      )}
+
+      </>
       )}
 
     </div>

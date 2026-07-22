@@ -14,6 +14,9 @@ const orgRoutes = require('./routes/organisations');
 const tokenRoutes = require('./routes/apiTokens');
 const { router: responseRoutes, fetchAndStore } = require('./routes/apiResponses');
 const healthRoutes = require('./routes/health');
+const osintRoutes = require('./routes/osint');
+const osintWatchlistRoutes = require('./routes/osintWatchlist');
+const mitreRoutes = require('./routes/mitre');
 
 // Integration routes
 const { authMiddleware } = require('./middleware/authMiddleware');
@@ -33,6 +36,7 @@ const analyticsRoutes = require('./routes/analyticsRoute');
 const syncRoutes = require('./routes/syncRoute');
 const adminOrgsRoutes = require('./routes/adminOrgs');
 const memberRoutes = require('./routes/memberRoute');
+const microsoftRoutes = require('./routes/microsoft');
 
 // Sync services (for cron)
 const { syncSentinelOne } = require('./services/sentinelone');
@@ -55,6 +59,9 @@ app.use('/api/organisations', orgRoutes);
 app.use('/api/tokens', tokenRoutes);
 app.use('/api/responses', responseRoutes);
 app.use('/api/health', healthRoutes);
+app.use('/api/osint', osintRoutes);
+app.use('/api/osint-watchlist', osintWatchlistRoutes);
+app.use('/api/mitre', mitreRoutes);
 
 // ─── Integration routes (auth + org context required) ─────────────────────────
 const withOrg = [authMiddleware, orgMiddleware];
@@ -73,6 +80,7 @@ app.use('/api/billing', withOrg, billingRoutes);
 app.use('/api/analytics', withOrg, analyticsRoutes);
 app.use('/api/sync', withOrg, syncRoutes);
 app.use('/api/member', [authMiddleware], memberRoutes);
+app.use('/api/microsoft', withOrg, microsoftRoutes);
 
 // Admin routes (superAdmin only — orgMiddleware not needed, uses centralPool directly)
 app.use('/api/admin', [authMiddleware], adminOrgsRoutes);
@@ -179,7 +187,7 @@ async function main() {
   await runSeedData();
 
   // 4. Start the HTTP server.
-  const PORT = process.env.PORT || 5000;
+  const PORT = process.env.PORT || 3000;
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://10.134.243.128:${PORT}`);
   });

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import api from '../../api';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CheckpointDashboard from './CheckpointDashboard';
+import { useProviders } from '../../context/ProviderContext.jsx';
 
 const ALL_EVENT_TYPES = ['phishing','malware','suspicious_malware','suspicious_phishing','dlp'];
 
@@ -17,7 +18,14 @@ const TABLE_PAGE_SIZE = 15;
 
 const fmt = (d) => d.toISOString().slice(0, 10);
 
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function mapEvent(e) {
+  const ad = e.additional_data || {};
   return {
     eventId: e.event_id,
     type: e.type,
@@ -26,6 +34,7 @@ function mapEvent(e) {
     confidenceIndicator: e.confidence_indicator,
     description: e.description,
     senderAddress: e.sender_address,
+    receiverAddress: ad.receiver_address || ad.recipient_address || ad.receiverAddress || ad.recipientAddress || ad.to || null,
     saas: e.saas,
     entityId: e.entity_id,
     entityLink: e.entity_link,
@@ -148,7 +157,16 @@ function ThreatCard({ label, summary, expanded, onToggle, activeTypes, onTypeCha
 
 // ── Detail Panel ─────────────────────────────────────────────────────────────
 
+// "new" on top, then "detected", everything else after — ties keep the
+// incoming (most-recent-first) order since Array.sort is stable.
+function eventStateRank(ev) {
+  if (ev.state === 'new') return 0;
+  if (ev.state === 'detected') return 1;
+  return 2;
+}
+
 function DetailPanel({ label, events }) {
+  const sortedEvents = [...events].sort((a, b) => eventStateRank(a) - eventStateRank(b));
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm mb-6">
       <div className="px-5 py-3.5 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
@@ -157,9 +175,9 @@ function DetailPanel({ label, events }) {
         </p>
       </div>
       <div className="divide-y divide-[var(--card-border)] max-h-96 overflow-y-auto">
-        {events.length === 0 ? (
+        {sortedEvents.length === 0 ? (
           <p className="px-5 py-6 text-sm text-[var(--muted)] text-center">No events to show.</p>
-        ) : events.map((ev, i) => {
+        ) : sortedEvents.map((ev, i) => {
           const isPending = ev.state === 'new' || ev.state === 'pending';
           return (
             <div key={ev.eventId || i} className={`flex items-start gap-3 px-5 py-2.5 transition-colors ${
@@ -215,6 +233,8 @@ function EventModal({ event, onClose }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CheckpointPage() {
+  const { selectedProviders } = useProviders();
+  const activeTool = selectedProviders.emailSecurity || 'Check Point Harmony';
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -226,6 +246,9 @@ export default function CheckpointPage() {
   const [phishingTypes, setPhishingTypes] = useState(['phishing']);
   const [malwareTypes, setMalwareTypes] = useState(['malware']);
   const [dlpTypes, setDlpTypes] = useState(['dlp']);
+
+  const [cardDateFrom, setCardDateFrom] = useState('');
+  const [cardDateTo, setCardDateTo]     = useState('');
 
   const [tableFilter, setTableFilter] = useState('all');
   const [tablePage, setTablePage] = useState(1);
@@ -271,10 +294,24 @@ export default function CheckpointPage() {
     setChartTypes(prev => prev.includes(t) ? (prev.length > 1 ? prev.filter(x => x !== t) : prev) : [...prev, t]);
   };
 
+  // Cards: date-filtered events
+  const hasCardDateFilter = !!(cardDateFrom || cardDateTo);
+  const cardEvents = useMemo(() => {
+    if (!hasCardDateFilter) return events;
+    return events.filter(e => {
+      const d = parseDate(e.eventCreated);
+      if (!d) return false;
+      const key = fmt(d);
+      if (cardDateFrom && key < cardDateFrom) return false;
+      if (cardDateTo   && key > cardDateTo)   return false;
+      return true;
+    });
+  }, [events, cardDateFrom, cardDateTo, hasCardDateFilter]);
+
   // Summaries
-  const phishingSummary = computeSummary(events, phishingTypes);
-  const malwareSummary  = computeSummary(events, malwareTypes);
-  const dlpSummary      = computeSummary(events, dlpTypes);
+  const phishingSummary = computeSummary(cardEvents, phishingTypes);
+  const malwareSummary  = computeSummary(cardEvents, malwareTypes);
+  const dlpSummary      = computeSummary(cardEvents, dlpTypes);
 
   // Chart data
   const chartData = useMemo(() => {
@@ -302,9 +339,10 @@ export default function CheckpointPage() {
   const pagedTableEvents = filteredTableEvents.slice((tablePage-1)*TABLE_PAGE_SIZE, tablePage*TABLE_PAGE_SIZE);
 
   // Detail lists
-  const phishingDetail = sortedEvents.filter(e => phishingTypes.includes(e.type));
-  const malwareDetail  = sortedEvents.filter(e => malwareTypes.includes(e.type));
-  const dlpDetail      = sortedEvents.filter(e => dlpTypes.includes(e.type));
+  const sortedCardEvents = [...cardEvents].sort((a,b) => new Date(b.eventCreated)-new Date(a.eventCreated));
+  const phishingDetail = sortedCardEvents.filter(e => phishingTypes.includes(e.type));
+  const malwareDetail  = sortedCardEvents.filter(e => malwareTypes.includes(e.type));
+  const dlpDetail      = sortedCardEvents.filter(e => dlpTypes.includes(e.type));
 
   if (loading) return (
     <div className="p-8 flex items-center justify-center h-64">
@@ -317,7 +355,7 @@ export default function CheckpointPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Check Point Harmony</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">{activeTool}</h1>
           <p className="text-sm text-[var(--muted)] mt-1">
             {lastSyncedAt ? `Last synced ${new Date(lastSyncedAt).toLocaleString()}` : 'Email & Collaboration security events'}
           </p>
@@ -345,6 +383,24 @@ export default function CheckpointPage() {
       )}
 
       {/* Three threat cards */}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-[var(--muted)] font-medium">From</label>
+          <input type="date" value={cardDateFrom} max={cardDateTo || undefined}
+            onChange={(e) => setCardDateFrom(e.target.value)}
+            className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-[var(--muted)] font-medium">To</label>
+          <input type="date" value={cardDateTo} min={cardDateFrom || undefined}
+            onChange={(e) => setCardDateTo(e.target.value)}
+            className="text-[10px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        </div>
+        {hasCardDateFilter && (
+          <button onClick={() => { setCardDateFrom(''); setCardDateTo(''); }}
+            className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <ThreatCard
           label="Phishing" summary={phishingSummary}
@@ -476,6 +532,7 @@ export default function CheckpointPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-[var(--muted)]">{ev.severity || '—'}</td>
                     <td className="px-4 py-3 text-xs text-[var(--foreground)] max-w-xs truncate">{ev.senderAddress || '—'}</td>
+                    {/* <td className="px-4 py-3 text-xs text-[var(--foreground)] max-w-xs truncate">{ev.receiverAddress || '—'}</td> */}
                     <td className="px-4 py-3 text-xs text-[var(--muted)] max-w-xs truncate">{ev.description || '—'}</td>
                     <td className="px-4 py-3 text-xs text-[var(--muted)]">{ev.eventCreated ? new Date(ev.eventCreated).toLocaleDateString() : '—'}</td>
                   </tr>

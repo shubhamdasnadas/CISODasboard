@@ -1,11 +1,57 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../../api.js';
+
+function parseDate(v) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8, fontSize: 12 };
 
-function KpiCard({ title, value, subtitle, accent }) {
+function DateFilter({ from, to, onFromChange, onToChange, onClear }) {
   return (
-    <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm">
+    <div className="flex items-center gap-1.5 flex-wrap">
+      <input type="date" value={from} max={to || undefined}
+        onChange={(e) => onFromChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      <span className="text-[10px] text-[var(--muted)]">→</span>
+      <input type="date" value={to} min={from || undefined}
+        onChange={(e) => onToChange(e.target.value)}
+        className="text-[10px] px-1.5 py-0.5 rounded-md border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-1 focus:ring-indigo-400" />
+      {(from || to) && (
+        <button onClick={onClear} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">✕</button>
+      )}
+    </div>
+  );
+}
+
+function useCardFilter(agents) {
+  const [from, setFrom] = useState('');
+  const [to, setTo]     = useState('');
+  const filtered = useMemo(() => {
+    if (!from && !to) return agents;
+    const f = from ? new Date(from) : null;
+    const t = to   ? new Date(to + 'T23:59:59') : null;
+    return agents.filter((a) => {
+      const d = parseDate(a.lastActiveDate);
+      if (!d) return false;
+      if (f && d < f) return false;
+      if (t && d > t) return false;
+      return true;
+    });
+  }, [agents, from, to]);
+  const clear = () => { setFrom(''); setTo(''); };
+  return { from, to, setFrom, setTo, clear, filtered };
+}
+
+function KpiCard({ title, value, subtitle, accent, onClick }) {
+  return (
+    <div
+      onClick={onClick}
+      className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-4 flex flex-col gap-1 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-md transition-shadow' : ''}`}
+    >
       <p className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-widest">{title}</p>
       <p className="text-3xl font-bold" style={{ color: accent }}>{value}</p>
       {subtitle && <p className="text-[11px] text-[var(--muted)]">{subtitle}</p>}
@@ -13,16 +59,19 @@ function KpiCard({ title, value, subtitle, accent }) {
   );
 }
 
-function SectionCard({ title, count, children }) {
+function SectionCard({ title, count, controls, children }) {
   return (
     <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm">
-      <div className="px-4 py-3 bg-[var(--muted-bg)] border-b border-[var(--card-border)] flex items-center justify-between">
-        <p className="text-sm font-bold text-[var(--foreground)]">{title}</p>
-        {count != null && (
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300">
-            {count}
-          </span>
-        )}
+      <div className="px-4 py-3 bg-[var(--muted-bg)] border-b border-[var(--card-border)] flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-bold text-[var(--foreground)]">{title}</p>
+          {count != null && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300">
+              {count}
+            </span>
+          )}
+        </div>
+        {controls && <div className="flex items-center gap-2">{controls}</div>}
       </div>
       {children}
     </div>
@@ -70,9 +119,12 @@ function ProgressBar({ value, max, color = '#6366f1' }) {
 }
 
 export default function S1Agent() {
+  const navigate = useNavigate();
   const [agents, setAgents]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [openUser, setOpenUser] = useState(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo]     = useState('');
 
   useEffect(() => {
     api.get('/sentinelone/db/agents')
@@ -85,35 +137,61 @@ export default function S1Agent() {
   const scanAgeDays  = (a) => a.lastSuccessfulScanDate ? Math.floor((Date.now() - new Date(a.lastSuccessfulScanDate)) / 86400000) : null;
   const fmt          = (d) => d ? new Date(d).toLocaleDateString() : '—';
 
+  // Global filtered agents by header date
+  const filteredAgents = useMemo(() => {
+    if (!dateFrom && !dateTo) return agents;
+    const f = dateFrom ? new Date(dateFrom) : null;
+    const t = dateTo   ? new Date(dateTo + 'T23:59:59') : null;
+    return agents.filter((a) => {
+      const d = parseDate(a.lastActiveDate);
+      if (!d) return false;
+      if (f && d < f) return false;
+      if (t && d > t) return false;
+      return true;
+    });
+  }, [agents, dateFrom, dateTo]);
+
+  // Per-card filters
+  const inactiveFilter   = useCardFilter(agents);
+  const oldVersionFilter = useCardFilter(agents);
+  const fwFilter         = useCardFilter(agents);
+  const threatsFilter    = useCardFilter(agents);
+  const scansFilter      = useCardFilter(agents);
+  const userMapFilter    = useCardFilter(agents);
+  const siteFilter       = useCardFilter(agents);
+  const osFilter         = useCardFilter(agents);
+  const networkFilter    = useCardFilter(agents);
+  const riskyFilter      = useCardFilter(agents);
+
   const kpis = useMemo(() => {
-    const total   = agents.length;
-    const active  = agents.filter((a) => a.isActive).length;
+    const total   = filteredAgents.length;
+    const active  = filteredAgents.filter((a) => a.isActive).length;
     const inactive = total - active;
-    const threats = agents.filter((a) => (a.activeThreats || 0) > 0).length;
-    const outdated = agents.filter((a) => !a.isUpToDate).length;
+    const threats = filteredAgents.filter((a) => (a.activeThreats || 0) > 0).length;
+    const outdated = filteredAgents.filter((a) => !a.isUpToDate).length;
     const health  = Math.round((active / Math.max(1, total)) * 100);
     return { total, active, inactive, threats, outdated, health };
-  }, [agents]);
+  }, [filteredAgents]);
 
   const inactiveMachines = useMemo(() =>
-    agents.filter((a) => !a.isActive && inactiveDays(a) > 7)
+    inactiveFilter.filtered.filter((a) => !a.isActive && inactiveDays(a) > 7)
       .sort((a, b) => inactiveDays(b) - inactiveDays(a))
-  , [agents]);
+  , [inactiveFilter.filtered]);
 
-  const oldVersion = useMemo(() => agents.filter((a) => !a.isUpToDate), [agents]);
+  const oldVersion = useMemo(() => oldVersionFilter.filtered.filter((a) => !a.isUpToDate), [oldVersionFilter.filtered]);
 
-  const fwDisabled = useMemo(() => agents.filter((a) => !a.firewallEnabled), [agents]);
+  const fwDisabled = useMemo(() => fwFilter.filtered.filter((a) => !a.firewallEnabled), [fwFilter.filtered]);
 
   const activeThreats = useMemo(() =>
-    agents.filter((a) => (a.activeThreats || 0) > 0)
+    threatsFilter.filtered.filter((a) => (a.activeThreats || 0) > 0)
       .sort((a, b) => b.activeThreats - a.activeThreats)
-  , [agents]);
+  , [threatsFilter.filtered]);
 
-  const oldScans = useMemo(() => agents.filter((a) => a.scanStatus !== 'finished'), [agents]);
+  const oldScans = useMemo(() => scansFilter.filtered.filter((a) => a.scanStatus !== 'finished'), [scansFilter.filtered]);
 
   const userDeviceMap = useMemo(() => {
     const map = {};
-    agents.forEach((a) => {
+    userMapFilter.filtered.forEach((a) => {
       const u = a.lastLoggedInUserName || 'Unknown';
       if (!map[u]) map[u] = [];
       map[u].push(a);
@@ -121,11 +199,11 @@ export default function S1Agent() {
     return Object.entries(map)
       .map(([user, devs]) => ({ user, total: devs.length, active: devs.filter((d) => d.isActive).length, inactive: devs.filter((d) => !d.isActive).length, devices: devs }))
       .sort((a, b) => b.total - a.total);
-  }, [agents]);
+  }, [userMapFilter.filtered]);
 
   const siteHealth = useMemo(() => {
     const map = {};
-    agents.forEach((a) => {
+    siteFilter.filtered.forEach((a) => {
       const s = a.siteName || 'Unknown';
       if (!map[s]) map[s] = { total: 0, active: 0 };
       map[s].total++;
@@ -134,11 +212,11 @@ export default function S1Agent() {
     return Object.entries(map)
       .map(([site, { total, active }]) => ({ site, total, active, inactive: total - active, score: Math.round((active / total) * 100) }))
       .sort((a, b) => b.total - a.total);
-  }, [agents]);
+  }, [siteFilter.filtered]);
 
   const osOutdated = useMemo(() => {
     const map = {};
-    agents.forEach((a) => {
+    osFilter.filtered.forEach((a) => {
       const os = a.osName || 'Unknown';
       if (!map[os]) map[os] = { total: 0, outdated: 0 };
       map[os].total++;
@@ -147,16 +225,16 @@ export default function S1Agent() {
     return Object.entries(map)
       .map(([os, { total, outdated }]) => ({ os, total, outdated, coverage: Math.round(((total - outdated) / total) * 100) }))
       .sort((a, b) => b.total - a.total);
-  }, [agents]);
+  }, [osFilter.filtered]);
 
   const networkStatus = useMemo(() => {
     const map = {};
-    agents.forEach((a) => { const s = a.networkStatus || 'unknown'; map[s] = (map[s] || 0) + 1; });
+    networkFilter.filtered.forEach((a) => { const s = a.networkStatus || 'unknown'; map[s] = (map[s] || 0) + 1; });
     return Object.entries(map).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
-  }, [agents]);
+  }, [networkFilter.filtered]);
 
   const topRisky = useMemo(() =>
-    agents.map((a) => {
+    riskyFilter.filtered.map((a) => {
       const reasons = [];
       let score = 0;
       if ((a.activeThreats || 0) > 0) { score += a.activeThreats * 30; reasons.push(`${a.activeThreats} active threat(s)`); }
@@ -169,7 +247,7 @@ export default function S1Agent() {
     .filter((a) => a.riskScore > 0)
     .sort((a, b) => b.riskScore - a.riskScore)
     .slice(0, 20)
-  , [agents]);
+  , [riskyFilter.filtered]);
 
   if (loading) {
     return (
@@ -194,10 +272,37 @@ export default function S1Agent() {
   return (
     <div className="p-4 sm:p-6 space-y-6">
 
-      {/* Header */}
-      <div>
-        <h1 className="text-xl font-bold text-[var(--foreground)]">Agent Analytics</h1>
-        <p className="text-sm text-[var(--muted)] mt-0.5">{kpis.total} agents · SentinelOne</p>
+      {/* Header + Global Date Filter */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-[var(--foreground)]">Agent Analytics</h1>
+          <p className="text-sm text-[var(--muted)] mt-0.5">
+            {kpis.total} agents · SentinelOne
+            {(dateFrom || dateTo) && (
+              <span className="ml-2 text-indigo-500 font-medium">
+                {dateFrom && dateTo ? `${dateFrom} → ${dateTo}` : dateFrom ? `From ${dateFrom}` : `Until ${dateTo}`}
+              </span>
+            )}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--muted)] font-medium">From</label>
+            <input type="date" value={dateFrom} max={dateTo || undefined}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[11px] text-[var(--muted)] font-medium">To</label>
+            <input type="date" value={dateTo} min={dateFrom || undefined}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-[11px] px-2 py-1 rounded-lg border border-[var(--card-border)] bg-[var(--card-bg)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
+          )}
+        </div>
       </div>
 
       {/* KPI row */}
@@ -205,13 +310,15 @@ export default function S1Agent() {
         <KpiCard title="Total Agents"   value={kpis.total}    accent="#3b82f6" />
         <KpiCard title="Active"         value={kpis.active}   accent="#10b981" subtitle={`${kpis.health}% health`} />
         <KpiCard title="Inactive"       value={kpis.inactive} accent="#ef4444" />
-        <KpiCard title="Active Threats" value={kpis.threats}  accent="#f59e0b" />
+        <KpiCard title="Active Threats" value={kpis.threats}  accent="#f59e0b"
+          onClick={() => navigate('/security/detail', { state: { dataset: 'agents', filterId: 'activeThreats', title: 'Endpoints with Active Threats' } })} />
         <KpiCard title="Outdated"       value={kpis.outdated} accent="#8b5cf6" />
         <KpiCard title="Health Score"   value={`${kpis.health}%`} accent="#06b6d4" subtitle="active/total" />
       </div>
 
       {/* 1. Inactive Machines */}
-      <SectionCard title="Inactive Machines (>7 days)" count={inactiveMachines.length}>
+      <SectionCard title="Inactive Machines (>7 days)" count={inactiveMachines.length}
+        controls={<DateFilter from={inactiveFilter.from} to={inactiveFilter.to} onFromChange={inactiveFilter.setFrom} onToChange={inactiveFilter.setTo} onClear={inactiveFilter.clear} />}>
         <TableWrap
           cols={['Machine', 'User', 'Site', 'Last Active', 'Days Inactive']}
           rows={inactiveMachines.map((a) => [a.computerName, a.lastLoggedInUserName, a.siteName, fmt(a.lastActiveDate), inactiveDays(a)])}
@@ -220,7 +327,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 2. Old Agent Version */}
-      <SectionCard title="Outdated Agent Version" count={oldVersion.length}>
+      <SectionCard title="Outdated Agent Version" count={oldVersion.length}
+        controls={<DateFilter from={oldVersionFilter.from} to={oldVersionFilter.to} onFromChange={oldVersionFilter.setFrom} onToChange={oldVersionFilter.setTo} onClear={oldVersionFilter.clear} />}>
         <TableWrap
           cols={['Machine', 'User', 'Site', 'Current Version']}
           rows={oldVersion.map((a) => [a.computerName, a.lastLoggedInUserName, a.siteName, a.agentVersion])}
@@ -229,7 +337,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 3. Firewall Disabled */}
-      <SectionCard title="Firewall Disabled" count={fwDisabled.length}>
+      <SectionCard title="Firewall Disabled" count={fwDisabled.length}
+        controls={<DateFilter from={fwFilter.from} to={fwFilter.to} onFromChange={fwFilter.setFrom} onToChange={fwFilter.setTo} onClear={fwFilter.clear} />}>
         <TableWrap
           cols={['Machine', 'User', 'Site', 'Last IP']}
           rows={fwDisabled.map((a) => [a.computerName, a.lastLoggedInUserName, a.siteName, a.lastIpToMgmt])}
@@ -238,7 +347,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 4. Active Threats */}
-      <SectionCard title="Endpoints with Active Threats" count={activeThreats.length}>
+      <SectionCard title="Endpoints with Active Threats" count={activeThreats.length}
+        controls={<DateFilter from={threatsFilter.from} to={threatsFilter.to} onFromChange={threatsFilter.setFrom} onToChange={threatsFilter.setTo} onClear={threatsFilter.clear} />}>
         <TableWrap
           cols={['Machine', 'User', 'Site', 'Threat Count', 'Mitigation Mode']}
           rows={activeThreats.map((a) => [a.computerName, a.lastLoggedInUserName, a.siteName, a.activeThreats, a.mitigationMode])}
@@ -247,7 +357,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 5. Old/Pending Scan */}
-      <SectionCard title="Old / Pending Scan" count={oldScans.length}>
+      <SectionCard title="Old / Pending Scan" count={oldScans.length}
+        controls={<DateFilter from={scansFilter.from} to={scansFilter.to} onFromChange={scansFilter.setFrom} onToChange={scansFilter.setTo} onClear={scansFilter.clear} />}>
         <TableWrap
           cols={['Machine', 'User', 'Last Scan', 'Scan Age (days)', 'Status']}
           rows={oldScans.map((a) => [a.computerName, a.lastLoggedInUserName, fmt(a.lastSuccessfulScanDate), scanAgeDays(a), a.scanStatus])}
@@ -256,7 +367,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 6. User–Device Mapping */}
-      <SectionCard title="User–Device Mapping" count={userDeviceMap.length}>
+      <SectionCard title="User–Device Mapping" count={userDeviceMap.length}
+        controls={<DateFilter from={userMapFilter.from} to={userMapFilter.to} onFromChange={userMapFilter.setFrom} onToChange={userMapFilter.setTo} onClear={userMapFilter.clear} />}>
         <div className="overflow-x-auto max-h-80 overflow-y-auto divide-y divide-[var(--card-border)]">
           {userDeviceMap.length === 0
             ? <div className="px-4 py-6 text-center text-sm text-[var(--muted)]">No data</div>
@@ -314,7 +426,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 7. Site Health Score */}
-      <SectionCard title="Site Health Score">
+      <SectionCard title="Site Health Score"
+        controls={<DateFilter from={siteFilter.from} to={siteFilter.to} onFromChange={siteFilter.setFrom} onToChange={siteFilter.setTo} onClear={siteFilter.clear} />}>
         <div className="overflow-x-auto max-h-72 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10">
@@ -340,7 +453,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 8. OS-wise Outdated */}
-      <SectionCard title="OS-wise Outdated Agents">
+      <SectionCard title="OS-wise Outdated Agents"
+        controls={<DateFilter from={osFilter.from} to={osFilter.to} onFromChange={osFilter.setFrom} onToChange={osFilter.setTo} onClear={osFilter.clear} />}>
         <div className="overflow-x-auto max-h-64 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10">
@@ -365,7 +479,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 9. Network Status Distribution */}
-      <SectionCard title="Network Status Distribution">
+      <SectionCard title="Network Status Distribution"
+        controls={<DateFilter from={networkFilter.from} to={networkFilter.to} onFromChange={networkFilter.setFrom} onToChange={networkFilter.setTo} onClear={networkFilter.clear} />}>
         <div className="overflow-x-auto max-h-64 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10">
@@ -380,7 +495,7 @@ export default function S1Agent() {
                 <tr key={status} className="hover:bg-[var(--muted-bg)]/60">
                   <td className="px-3 py-2 font-medium text-[var(--foreground)] capitalize">{status}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{count}</td>
-                  <td className="px-3 py-2 min-w-[140px]"><ProgressBar value={count} max={agents.length} color="#3b82f6" /></td>
+                  <td className="px-3 py-2 min-w-[140px]"><ProgressBar value={count} max={networkFilter.filtered.length} color="#3b82f6" /></td>
                 </tr>
               ))}
             </tbody>
@@ -389,7 +504,8 @@ export default function S1Agent() {
       </SectionCard>
 
       {/* 10. Top Risky Endpoints */}
-      <SectionCard title="Top Risky Endpoints" count={topRisky.length}>
+      <SectionCard title="Top Risky Endpoints" count={topRisky.length}
+        controls={<DateFilter from={riskyFilter.from} to={riskyFilter.to} onFromChange={riskyFilter.setFrom} onToChange={riskyFilter.setTo} onClear={riskyFilter.clear} />}>
         <div className="overflow-x-auto max-h-80 overflow-y-auto">
           <table className="w-full text-xs">
             <thead className="sticky top-0 z-10">
@@ -401,7 +517,11 @@ export default function S1Agent() {
             </thead>
             <tbody className="divide-y divide-[var(--card-border)]">
               {topRisky.map((a, i) => (
-                <tr key={i} className="hover:bg-[var(--muted-bg)]/60">
+                <tr
+                  key={i}
+                  onClick={() => navigate('/security/detail', { state: { dataset: 'agents', filterId: 'agentDetail', value: a.computerName, title: `Agent Detail: ${a.computerName}` } })}
+                  className="hover:bg-[var(--muted-bg)]/60 cursor-pointer"
+                >
                   <td className="px-3 py-2 font-medium text-[var(--foreground)]">{a.computerName}</td>
                   <td className="px-3 py-2 text-[var(--muted)]">{a.lastLoggedInUserName}</td>
                   <td className="px-3 py-2">
