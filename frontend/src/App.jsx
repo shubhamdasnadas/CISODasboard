@@ -9,6 +9,7 @@ import Login from './pages/Login.jsx';
 import SelectOrganisation from './pages/SelectOrganisation.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import MDM from './pages/MDM.jsx';
+import MDMDetailView from './pages/MDMDetailView.jsx';
 import Organisations from './pages/Organisations.jsx';
 import Users from './pages/Users.jsx';
 import ApiTokens from './pages/ApiTokens.jsx';
@@ -114,6 +115,7 @@ export default function App() {
                 {/* Core */}
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mdm" element={<MDM />} />
+                <Route path="/mdm/detail" element={<MDMDetailView />} />
                 <Route path="/organisations" element={<Organisations />} />
                 <Route path="/tokens" element={<ApiTokens />} />
                 <Route path="/responses" element={<ApiResponses />} />

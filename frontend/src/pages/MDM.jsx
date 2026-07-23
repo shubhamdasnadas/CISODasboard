@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+
+const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8, fontSize: 12 };
 
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
 
@@ -19,11 +22,15 @@ function Empty({ msg }) {
   );
 }
 
-function CardShell({ title, children, className = '' }) {
+function CardShell({ title, description, children, className = '', onHeaderClick }) {
   return (
     <div className={`bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl overflow-hidden shadow-sm flex flex-col ${className}`}>
-      <div className="px-5 py-3.5 border-b border-[var(--card-border)] bg-[var(--muted-bg)]">
-        <h3 className="text-sm font-bold text-[var(--foreground)]">{title}</h3>
+      <div
+        className={`px-5 py-3.5 border-b border-[var(--card-border)] bg-[var(--muted-bg)] ${onHeaderClick ? 'cursor-pointer hover:bg-[var(--card-border)]/40 transition-colors' : ''}`}
+        onClick={onHeaderClick}
+      >
+        <h3 className={`text-sm font-bold text-[var(--foreground)] ${onHeaderClick ? 'hover:underline' : ''}`}>{title}</h3>
+        {description && <p className="text-xs text-[var(--muted)] mt-0.5">{description}</p>}
       </div>
       <div className="flex-1 min-h-0">{children}</div>
     </div>
@@ -31,14 +38,14 @@ function CardShell({ title, children, className = '' }) {
 }
 
 export default function MDM() {
+  const navigate = useNavigate();
   const [devices, setDevices] = useState([]);
   const [devicesLoading, setDevicesLoading] = useState(true);
   const [apps, setApps] = useState([]);
   const [appsLoading, setAppsLoading] = useState(true);
 
-  const [selectedDeviceId, setSelectedDeviceId] = useState('');
-  const [deviceApps, setDeviceApps] = useState([]);
-  const [deviceAppsLoading, setDeviceAppsLoading] = useState(false);
+  const [flaggedApps, setFlaggedApps] = useState([]);
+  const [flaggedAppsLoading, setFlaggedAppsLoading] = useState(true);
 
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState(null);
@@ -60,20 +67,20 @@ export default function MDM() {
       .finally(() => setAppsLoading(false));
   };
 
+  const loadFlaggedApps = () => {
+    setFlaggedAppsLoading(true);
+    api.get('/hexnode/db/device-applications/flagged')
+      .then((r) => setFlaggedApps(Array.isArray(r.data?.data) ? r.data.data : []))
+      .catch(() => setFlaggedApps([]))
+      .finally(() => setFlaggedAppsLoading(false));
+  };
+
   useEffect(() => {
     loadDevices();
     loadApps();
+    loadFlaggedApps();
     api.get('/hexnode/credentials').then((r) => setLastSyncedAt(r.data?.lastSyncedAt ?? null)).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!selectedDeviceId) { setDeviceApps([]); return; }
-    setDeviceAppsLoading(true);
-    api.get(`/hexnode/db/device-applications?deviceId=${encodeURIComponent(selectedDeviceId)}`)
-      .then((r) => setDeviceApps(Array.isArray(r.data?.data) ? r.data.data : []))
-      .catch(() => setDeviceApps([]))
-      .finally(() => setDeviceAppsLoading(false));
-  }, [selectedDeviceId]);
 
   const handleSync = async () => {
     setSyncing(true); setSyncMsg(null);
@@ -83,6 +90,7 @@ export default function MDM() {
       setSyncMsg({ text: (r.data.message || 'Sync complete') + warnings, ok: !r.data.warnings?.length });
       loadDevices();
       loadApps();
+      loadFlaggedApps();
       setLastSyncedAt(new Date().toISOString());
     } catch (err) {
       setSyncMsg({ text: err.response?.data?.message || 'Sync failed — configure credentials in Settings', ok: false });
@@ -97,6 +105,39 @@ export default function MDM() {
     osCounts[os] = (osCounts[os] || 0) + 1;
   });
   const osData = Object.entries(osCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
+
+  const compliantCount = devices.filter((d) => d.compliant === true).length;
+  const nonCompliantCount = devices.length - compliantCount;
+  const complianceData = devices.length === 0 ? [] : [
+    { name: 'Compliant', value: compliantCount, fill: '#10b981' },
+    { name: 'Non-compliant', value: nonCompliantCount, fill: '#ef4444' },
+  ];
+
+  const deviceTypeCounts = {};
+  devices.forEach((d) => {
+    const type = d.device_type || 'unknown';
+    deviceTypeCounts[type] = (deviceTypeCounts[type] || 0) + 1;
+  });
+  const deviceTypeData = Object.entries(deviceTypeCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
+
+  const STALE_DAYS = 7;
+  const staleDevices = devices
+    .filter((d) => d.last_reported && (Date.now() - new Date(d.last_reported).getTime()) > STALE_DAYS * 24 * 60 * 60 * 1000)
+    .sort((a, b) => new Date(a.last_reported) - new Date(b.last_reported));
+
+  const platformCounts = {};
+  apps.forEach((a) => {
+    const platform = a.platform || 'unknown';
+    platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+  });
+  const platformData = Object.entries(platformCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
+
+  const categoryCounts = {};
+  apps.forEach((a) => {
+    const category = a.category || 'Uncategorized';
+    categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+  });
+  const categoryData = Object.entries(categoryCounts).map(([name, value], i) => ({ name, value, fill: COLORS[i % COLORS.length] }));
 
   return (
     <div className="p-6 lg:p-8 space-y-6">
@@ -160,7 +201,8 @@ export default function MDM() {
                     const status = d.compliance_state || d.enrollment_status || d.status || 'unknown';
                     const isGood = /compliant|active|enrolled/i.test(String(status));
                     return (
-                      <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
+                      <tr key={i} className={`cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'} hover:bg-indigo-50 dark:hover:bg-indigo-900/20`}
+                        onClick={() => navigate('/mdm/detail', { state: { dataset: 'devices', filterId: 'deviceId', value: d.id, title: `Device — ${name}` } })}>
                         <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{name}</td>
                         <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--muted)]">{os}</td>
                         <td className="px-4 py-2.5 border-b border-[var(--card-border)]">
@@ -175,15 +217,16 @@ export default function MDM() {
           </div>
         </CardShell>
 
-        <CardShell title="OS / Platform Breakdown" className="h-[420px]">
+        <CardShell title="Device OS / Platform Breakdown" className="h-[420px]">
           <div className="h-full p-3">
             {devicesLoading ? <Spin /> : osData.length === 0 ? <Empty msg="No device data" /> : (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={osData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="50%" outerRadius="70%" paddingAngle={2}>
+                  <Pie data={osData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="50%" outerRadius="70%" paddingAngle={2} cursor="pointer"
+                    onClick={(d) => navigate('/mdm/detail', { state: { dataset: 'devices', filterId: 'os', value: d.name, title: `Devices — ${d.name}` } })}>
                     {osData.map((d, i) => <Cell key={i} fill={d.fill} />)}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={tooltipStyle} />
                   <Legend iconSize={9} wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -192,8 +235,67 @@ export default function MDM() {
         </CardShell>
       </div>
 
-      {/* Application Inventory + Per-Device Installed Apps */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Compliance Status + Device Type Breakdown + Stale Devices */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <CardShell title="Compliance Status" className="h-[340px]">
+          <div className="h-full p-3">
+            {devicesLoading ? <Spin /> : complianceData.length === 0 ? <Empty msg="No device data" /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={complianceData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="50%" outerRadius="70%" paddingAngle={2} cursor="pointer"
+                    onClick={(d) => navigate('/mdm/detail', { state: { dataset: 'devices', filterId: 'compliant', value: d.name === 'Compliant', title: `${d.name} Devices` } })}>
+                    {complianceData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                  </Pie>
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Legend iconSize={9} wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </CardShell>
+
+        <CardShell title="Device Type Breakdown" className="h-[340px]">
+          <div className="h-full p-3">
+            {devicesLoading ? <Spin /> : deviceTypeData.length === 0 ? <Empty msg="No device data" /> : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={deviceTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="50%" outerRadius="70%" paddingAngle={2}>
+                    {deviceTypeData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                  </Pie>
+                  <Tooltip />
+                  <Legend iconSize={9} wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </CardShell>
+
+        <CardShell title="Stale Devices" description={`(inactive for >${STALE_DAYS}d)`} className="h-[340px]">
+          <div className="h-full overflow-auto">
+            {devicesLoading ? <Spin /> : staleDevices.length === 0 ? <Empty msg="No stale devices — all reporting recently" /> : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-[var(--muted-bg)]">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Device</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Last Reported</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {staleDevices.map((d, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{d.device_name || d.name || `Device ${d.id}`}</td>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--muted)]">{new Date(d.last_reported).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </CardShell>
+      </div>
+
+      {/* Application Inventory */}
+      <div className="grid grid-cols-1 gap-4">
         <CardShell title="Application Inventory" className="h-[420px]">
           <div className="h-full overflow-auto">
             {appsLoading ? <Spin /> : apps.length === 0 ? <Empty msg="No applications found — configure & sync Hexnode in Settings" /> : (
@@ -205,50 +307,85 @@ export default function MDM() {
                   </tr>
                 </thead>
                 <tbody>
-                  {apps.map((a, i) => (
-                    <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
-                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{a.name || a.app_name || 'Unknown'}</td>
+                  {apps.map((a, i) => {
+                    const name = a.name || a.app_name || 'Unknown';
+                    return (
+                    <tr key={i} className={`cursor-pointer transition-colors ${i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'} hover:bg-indigo-50 dark:hover:bg-indigo-900/20`}
+                      onClick={() => navigate('/mdm/detail', { state: { dataset: 'apps', filterId: 'appId', value: a.id, title: `App — ${name}` } })}>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{name}</td>
                       <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--muted)]">{a.version || '—'}</td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             )}
           </div>
         </CardShell>
+      </div>
 
-        <CardShell title="Per-Device Installed Apps" className="h-[420px]">
-          <div className="flex flex-col h-full">
-            <div className="px-4 py-3 border-b border-[var(--card-border)]">
-              <select value={selectedDeviceId} onChange={(e) => setSelectedDeviceId(e.target.value)}
-                className="w-full h-9 border border-[var(--input-border)] rounded-lg px-3 text-sm font-medium text-[var(--foreground)] bg-[var(--card-bg)] focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="">Select a device…</option>
-                {devices.map((d, i) => (
-                  <option key={d.id ?? i} value={d.id ?? ''}>{d.device_name || d.name || d.model || `Device ${d.id ?? i}`}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1 min-h-0 overflow-auto">
-              {!selectedDeviceId ? <Empty msg="Select a device to view its installed apps" /> :
-                deviceAppsLoading ? <Spin /> : deviceApps.length === 0 ? <Empty msg="No apps found for this device" /> : (
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 z-10 bg-[var(--muted-bg)]">
-                    <tr>
-                      <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Application</th>
-                      <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Version</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {deviceApps.map((a, i) => (
-                      <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
-                        <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{a.name || a.app_name || 'Unknown'}</td>
-                        <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--muted)]">{a.version || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+      {/* App Platform/Category Breakdown + Blacklisted/Mandatory Apps */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <CardShell title="App Platform Breakdown" className="h-[420px]">
+          <div className="h-full grid grid-cols-1 gap-2 p-3">
+            <div className="h-full min-w-0">
+              <p className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider text-center mb-1">Platform</p>
+              {appsLoading ? <Spin /> : platformData.length === 0 ? <Empty msg="No app data" /> : (
+                <ResponsiveContainer width="100%" height="90%">
+                  <PieChart>
+                    <Pie data={platformData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="45%" outerRadius="65%" paddingAngle={2} cursor="pointer"
+                      onClick={(d) => navigate('/mdm/detail', { state: { dataset: 'apps', filterId: 'platform', value: d.name, title: `Apps — ${d.name}` } })}>
+                      {platformData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                    </Pie>
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Legend iconSize={8} wrapperStyle={{ fontSize: 10, color: 'var(--muted)' }} />
+                  </PieChart>
+                </ResponsiveContainer>
               )}
             </div>
+            {/* <div className="h-full min-w-0">
+              <p className="text-[10px] font-semibold text-[var(--muted)] uppercase tracking-wider text-center mb-1">Category</p>
+              {appsLoading ? <Spin /> : categoryData.length === 0 ? <Empty msg="No app data" /> : (
+                <ResponsiveContainer width="100%" height="90%">
+                  <PieChart>
+                    <Pie data={categoryData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="45%" outerRadius="65%" paddingAngle={2}>
+                      {categoryData.map((d, i) => <Cell key={i} fill={d.fill} />)}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div> */}
+          </div>
+        </CardShell>
+
+        <CardShell title="Blacklisted / Mandatory Apps" className="h-[420px]">
+          <div className="h-full overflow-auto">
+            {flaggedAppsLoading ? <Spin /> : flaggedApps.length === 0 ? <Empty msg="No blacklisted or mandatory apps found" /> : (
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-[var(--muted-bg)]">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">App</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Device ID</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-[var(--muted)] border-b border-[var(--card-border)]">Flags</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flaggedApps.map((a, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-[var(--card-bg)]' : 'bg-[var(--muted-bg)]'}>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--foreground)] font-medium">{a.name || 'Unknown'}</td>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)] text-[var(--muted)]">{a.deviceId ?? '—'}</td>
+                      <td className="px-4 py-2.5 border-b border-[var(--card-border)]">
+                        <div className="flex gap-1.5">
+                          {a.black_listed && <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">Blacklisted</span>}
+                          {a.mandatory_app && <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">Mandatory</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </CardShell>
       </div>
