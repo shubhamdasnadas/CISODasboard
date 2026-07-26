@@ -10,6 +10,8 @@ import SelectOrganisation from './pages/SelectOrganisation.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import MDM from './pages/MDM.jsx';
 import MDMDetailView from './pages/MDMDetailView.jsx';
+import Microsoft365 from './pages/Microsoft365.jsx';
+import Microsoft365DetailView from './pages/Microsoft365DetailView.jsx';
 import Organisations from './pages/Organisations.jsx';
 import Users from './pages/Users.jsx';
 import ApiTokens from './pages/ApiTokens.jsx';
@@ -116,6 +118,8 @@ export default function App() {
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/mdm" element={<MDM />} />
                 <Route path="/mdm/detail" element={<MDMDetailView />} />
+                <Route path="/microsoft365" element={<Microsoft365 />} />
+                <Route path="/microsoft365/detail" element={<Microsoft365DetailView />} />
                 <Route path="/organisations" element={<Organisations />} />
                 <Route path="/tokens" element={<ApiTokens />} />
                 <Route path="/responses" element={<ApiResponses />} />
