@@ -3,6 +3,7 @@ import api from '../../api';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CheckpointDashboard from './CheckpointDashboard';
 import { useProviders } from '../../context/ProviderContext.jsx';
+import Emailsecuritymttr from '../CyberHygen/Emailsecuritymttr.jsx';
 
 const ALL_EVENT_TYPES = ['phishing','malware','suspicious_malware','suspicious_phishing','dlp'];
 
@@ -401,7 +402,7 @@ export default function CheckpointPage() {
             className="text-[10px] text-indigo-500 hover:text-indigo-700 font-semibold">Clear</button>
         )}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <ThreatCard
           label="Phishing" summary={phishingSummary}
           expanded={openCard === 'phishing'} onToggle={() => toggleCard('phishing')}
@@ -417,6 +418,7 @@ export default function CheckpointPage() {
           expanded={openCard === 'dlp'} onToggle={() => toggleCard('dlp')}
           activeTypes={dlpTypes} onTypeChange={setDlpTypes}
         />
+        <Emailsecuritymttr />
       </div>
 
       {/* Detail panels */}

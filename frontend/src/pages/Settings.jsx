@@ -4,6 +4,13 @@ import api from '../api';
 import { useOrg } from '../context/OrgContext';
 import { useProviders } from '../context/ProviderContext';
 
+// Import provider icons from image folder
+import sentinelOneImg from '../../image/sentinelone.png';
+import paloAltoImg from '../../image/paloalto.png';
+import checkpointImg from '../../image/checkpoint.png';
+import microsoftImg from '../../image/microsoft.png';
+import zohoLogoImg from '../../image/zoho-logo.png';
+
 export default function Settings() {
   const navigate = useNavigate();
   const { currentOrg } = useOrg();
@@ -14,26 +21,26 @@ export default function Settings() {
   // Available providers for each category
   const providers = {
     edr: [
-      { name: 'SentinelOne', path: '/settings/sentinelone', icon: '🛡️', color: 'emerald' },
+      { name: 'SentinelOne', path: '/settings/sentinelone', icon: sentinelOneImg, color: 'emerald' },
       { name: 'CrowdStrike', path: '/settings/crowdstrike', icon: '🔒', color: 'purple' },
     ],
     deviceManagement: [
       { name: 'Hexnode', path: '/settings/hexnode', icon: '📱', color: 'blue' },
     ],
     emailSecurity: [
-      { name: 'Check Point Harmony', path: '/settings/harmony', icon: '✅', color: 'indigo' },
+      { name: 'Check Point Harmony', path: '/settings/harmony', icon: checkpointImg, color: 'indigo' },
       { name: 'Mimecast', path: '/settings/mimecast', icon: '📧', color: 'blue' },
     ],
     firewall: [
-      { name: 'Palo Alto', path: '/settings/firewall', icon: '🔥', color: 'orange' },
+      { name: 'Palo Alto', path: '/settings/firewall', icon: paloAltoImg, color: 'orange' },
       { name: 'Fortinet', path: '/settings/fortinet', icon: '🏰', color: 'red' },
     ],
     ticketing: [
-      { name: 'Zoho Desk', path: '/settings/zoho', icon: '🎫', color: 'red' },
+      { name: 'Zoho Desk', path: '/settings/zoho', icon: zohoLogoImg, color: 'red' },
       { name: 'ServiceNow', path: '/settings/servicenow', icon: '💼', color: 'green' },
     ],
     identity: [
-      { name: 'Microsoft', path: '/settings/microsoft', icon: '🪟', color: 'blue' },
+      { name: 'Microsoft', path: '/settings/microsoft', icon: microsoftImg, color: 'blue' },
     ],
   };
 
@@ -112,27 +119,39 @@ export default function Settings() {
   };
 
   // Render a provider card
-  const renderProviderCard = (provider, category) => (
-    <div key={provider.name} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 transition-colors">
-      <div className="flex items-center gap-3">
-        <div className={`w-8 h-8 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center`}>
-          <span className="text-sm">{provider.icon}</span>
+  const renderProviderCard = (provider, category) => {
+    const isImageIcon = typeof provider.icon === 'object' || typeof provider.icon === 'string' && provider.icon.startsWith('/');
+    const isSentinelOne = provider.name === 'SentinelOne';
+    return (
+      <div key={provider.name} className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-xl p-4 hover:border-indigo-500 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-lg ${getColorClass(provider.color)} flex items-center justify-center ${isSentinelOne ? 'dark:bg-white' : ''}`}>
+            {isImageIcon ? (
+              <img 
+                src={provider.icon} 
+                alt={provider.name} 
+                className="w-10 h-10 object-contain"
+              />
+            ) : (
+              <span className="text-base">{provider.icon}</span>
+            )}
+          </div>
+          <div className="flex-1">
+            <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
+            <p className="text-xs text-[var(--muted)]">Click to configure</p>
+          </div>
         </div>
-        <div className="flex-1">
-          <h4 className="font-medium text-[var(--foreground)]">{provider.name}</h4>
-          <p className="text-xs text-[var(--muted)]">Click to configure</p>
+        <div className="mt-4 flex gap-2">
+          <button onClick={() => navigate(provider.path)} className="flex-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium">
+            Configure
+          </button>
+          <button onClick={() => handleSetProvider(category, provider.name)} className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
+            Set as Active
+          </button>
         </div>
       </div>
-      <div className="mt-4 flex gap-2">
-        <button onClick={() => navigate(provider.path)} className="flex-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-medium">
-          Configure
-        </button>
-        <button onClick={() => handleSetProvider(category, provider.name)} className="flex-1 text-xs bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium">
-          Set as Active
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="p-6 lg:p-8 max-w-6xl">

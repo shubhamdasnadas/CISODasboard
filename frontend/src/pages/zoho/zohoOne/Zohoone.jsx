@@ -9,6 +9,7 @@ import Funneldiagram from './Funneldiagram';
 import Hourbasedset from './Hourbasedset';
 import Zohoticketcount from './Zohoticketcount';
 import Topperformance from './Topperformance';
+import Ticketingmttr from '../../CyberHygen/Ticketingmttr.jsx';
 
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const agingBuckets = ['<1h', '1-4h', '4-24h', '1-3d', '3+d'];
@@ -713,6 +714,13 @@ export default function Zohoone() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-6">
+          <h3 className="font-semibold text-[var(--foreground)] mb-4">Ticketing MTTR</h3>
+          {/* <ResponsiveContainer width="100%" height={200}> */}
+            <Ticketingmttr tickets={tickets} loading={loading} />
+          {/* </ResponsiveContainer> */}
+        </div>
+
         <div className="bg-[var(--card-bg)] border border-[var(--card-border)] rounded-2xl p-6">
           <h3 className="font-semibold text-[var(--foreground)] mb-4">By Status</h3>
           <ResponsiveContainer width="100%" height={200}>

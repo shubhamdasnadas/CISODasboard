@@ -22,6 +22,7 @@ import S1ConfigWidget from './dashboard/S1ConfigWidget.jsx';
 import CheckpointWidgetPicker from './dashboard/CheckpointWidgetPicker.jsx';
 import SentinelOneWidgetPicker from './dashboard/SentinelOneWidgetPicker.jsx';
 import ZohoTicketMatrix from './zoho/ZohoTicketMatrix.jsx';
+import AllCommonmttr from './CyberHygen/AllCommonmttr.jsx';
 
 // ── Small UI helpers ────────────────────────────────────────────────────────────
 function Spin() {
@@ -1387,8 +1388,15 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* ── Zoho Ticket Matrix ──────────────────────────────────────────────── */}
+      {/* ── MTTR Summary Card ───────────────────────────────────────────────── */}
+      <div className="mt-8 mb-2 w-1/2">
+        <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">MTTR Summary</h2>
+        <div className="bg-[var(--card-bg)] rounded-2xl border border-[var(--card-border)] shadow-sm overflow-hidden ">
+          <AllCommonmttr />
+        </div>
+      </div>
 
+      {/* ── Zoho Ticket Matrix ──────────────────────────────────────────────── */}
       <div className="mt-8 mb-2">
         <h2 className="text-sm font-bold text-[var(--foreground)] mb-4">Zoho Ticket Dashboard</h2>
         <ZohoTicketMatrix />

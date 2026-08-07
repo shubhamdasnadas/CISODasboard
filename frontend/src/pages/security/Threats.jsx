@@ -5,8 +5,9 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import api from '../../api.js';
+import S1Mttr from '../CyberHygen/S1Mttr.jsx';
 
-const CHART_COLORS = ['#3b82f6','#f59e0b','#10b981','#ef4444','#8b5cf6','#06b6d4','#ec4899','#6366f1'];
+const CHART_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#6366f1'];
 const tooltipStyle = { background: 'var(--card-bg)', border: '1px solid var(--card-border)', borderRadius: 8, fontSize: 12 };
 
 // Canonical ATT&CK kill-chain order — S1's tactic names are matched against
@@ -93,11 +94,11 @@ function DateFilter({ from, to, onFromChange, onToChange, onClear }) {
 
 function useCardFilter(threats) {
   const [from, setFrom] = useState('');
-  const [to, setTo]     = useState('');
+  const [to, setTo] = useState('');
   const filtered = useMemo(() => {
     if (!from && !to) return threats;
     const f = from ? new Date(from) : null;
-    const t = to   ? new Date(to + 'T23:59:59') : null;
+    const t = to ? new Date(to + 'T23:59:59') : null;
     return threats.filter((x) => {
       const d = parseDate(x.threatInfo?.createdAt);
       if (!d) return false;
@@ -176,39 +177,39 @@ export default function Threats() {
   const [threats, setThreats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo]     = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   useEffect(() => {
     setLoading(true);
     api.get('/sentinelone/db/threats')
       .then((r) => setThreats(r.data?.data || r.data?.threats || []))
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setLoading(false));
   }, []);
 
   const filteredThreats = useMemo(() => {
     if (!dateFrom && !dateTo) return threats;
     const from = dateFrom ? new Date(dateFrom) : null;
-    const to   = dateTo   ? new Date(dateTo + 'T23:59:59') : null;
+    const to = dateTo ? new Date(dateTo + 'T23:59:59') : null;
     return threats.filter((t) => {
       const d = parseDate(t.threatInfo?.createdAt);
       if (!d) return false;
       if (from && d < from) return false;
-      if (to   && d > to)   return false;
+      if (to && d > to) return false;
       return true;
     });
   }, [threats, dateFrom, dateTo]);
 
   const kpis = useMemo(() => {
-    const total      = filteredThreats.length;
-    const mitigated  = filteredThreats.filter((t) => t.threatInfo?.mitigationStatus === 'mitigated').length;
-    const unresolved = filteredThreats.filter((t) => ['unresolved','active'].includes(t.threatInfo?.incidentStatus)).length;
-    const fileless   = filteredThreats.filter((t) => t.threatInfo?.isFileless).length;
+    const total = filteredThreats.length;
+    const mitigated = filteredThreats.filter((t) => t.threatInfo?.mitigationStatus === 'mitigated').length;
+    const unresolved = filteredThreats.filter((t) => ['unresolved', 'active'].includes(t.threatInfo?.incidentStatus)).length;
+    const fileless = filteredThreats.filter((t) => t.threatInfo?.isFileless).length;
 
     let mttdSum = 0, mttdCount = 0;
     let mttmSum = 0, mttmCount = 0;
     filteredThreats.forEach((t) => {
-      const created    = parseDate(t.threatInfo?.createdAt);
+      const created = parseDate(t.threatInfo?.createdAt);
       const identified = parseDate(t.threatInfo?.identifiedAt);
       if (created && identified) { mttdSum += (created - identified) / 60000; mttdCount++; }
       const successEntry = (t.mitigationStatus || []).find((s) => s.status === 'success');
@@ -224,19 +225,19 @@ export default function Threats() {
     };
   }, [filteredThreats]);
 
-  const trendFilter      = useCardFilter(threats);
-  const endpointFilter   = useCardFilter(threats);
-  const mitreFilter      = useCardFilter(threats);
-  const matrixFilter     = useCardFilter(threats);
-  const classFilter      = useCardFilter(threats);
-  const filelessFilter   = useCardFilter(threats);
-  const mitigFilter      = useCardFilter(threats);
-  const usersFilter      = useCardFilter(threats);
-  const severityFilter   = useCardFilter(threats);
-  const mttdFilter       = useCardFilter(threats);
-  const mttmFilter       = useCardFilter(threats);
-  const siteFilter       = useCardFilter(threats);
-  const groupFilter      = useCardFilter(threats);
+  const trendFilter = useCardFilter(threats);
+  const endpointFilter = useCardFilter(threats);
+  const mitreFilter = useCardFilter(threats);
+  const matrixFilter = useCardFilter(threats);
+  const classFilter = useCardFilter(threats);
+  const filelessFilter = useCardFilter(threats);
+  const mitigFilter = useCardFilter(threats);
+  const usersFilter = useCardFilter(threats);
+  const severityFilter = useCardFilter(threats);
+  const mttdFilter = useCardFilter(threats);
+  const mttmFilter = useCardFilter(threats);
+  const siteFilter = useCardFilter(threats);
+  const groupFilter = useCardFilter(threats);
 
   const filteredThreatTrend = useMemo(() => {
     const counts = {};
@@ -336,8 +337,8 @@ export default function Threats() {
   const filelessData = useMemo(() => {
     const f = filelessFilter.filtered.filter((t) => t.threatInfo?.isFileless).length;
     return [
-      { name: 'Fileless',   value: f,                                    fill: '#ef4444' },
-      { name: 'File-based', value: filelessFilter.filtered.length - f,   fill: '#3b82f6' },
+      { name: 'Fileless', value: f, fill: '#ef4444' },
+      { name: 'File-based', value: filelessFilter.filtered.length - f, fill: '#3b82f6' },
     ];
   }, [filelessFilter.filtered]);
 
@@ -367,12 +368,12 @@ export default function Threats() {
   const mttdTrend = useMemo(() => {
     const byDay = {};
     mttdFilter.filtered.forEach((t) => {
-      const created    = parseDate(t.threatInfo?.createdAt);
+      const created = parseDate(t.threatInfo?.createdAt);
       const identified = parseDate(t.threatInfo?.identifiedAt);
       if (!created || !identified) return;
       const key = created.toISOString().slice(0, 10);
       if (!byDay[key]) byDay[key] = { sum: 0, count: 0 };
-      byDay[key].sum   += (created - identified) / 60000;
+      byDay[key].sum += (created - identified) / 60000;
       byDay[key].count += 1;
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
@@ -382,14 +383,14 @@ export default function Threats() {
   const mttmTrend = useMemo(() => {
     const byDay = {};
     mttmFilter.filtered.forEach((t) => {
-      const identified   = parseDate(t.threatInfo?.identifiedAt);
+      const identified = parseDate(t.threatInfo?.identifiedAt);
       const successEntry = (t.mitigationStatus || []).find((s) => s.status === 'success');
       if (!identified || !successEntry) return;
       const ended = parseDate(successEntry.mitigationEndedAt);
       if (!ended) return;
       const key = identified.toISOString().slice(0, 10);
       if (!byDay[key]) byDay[key] = { sum: 0, count: 0 };
-      byDay[key].sum   += (ended - identified) / 60000;
+      byDay[key].sum += (ended - identified) / 60000;
       byDay[key].count += 1;
     });
     return Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b))
@@ -469,14 +470,14 @@ export default function Threats() {
 
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KpiCard title="Total Threats" value={kpis.total}   accent="#3b82f6" />
-        <KpiCard title="Mitigated"     value={kpis.mitigated} accent="#10b981"
+        <KpiCard title="Total Threats" value={kpis.total} accent="#3b82f6" />
+        <KpiCard title="Mitigated" value={kpis.mitigated} accent="#10b981"
           subtitle={`${kpis.total > 0 ? Math.round((kpis.mitigated / kpis.total) * 100) : 0}% of total`} />
-        <KpiCard title="Unresolved"    value={kpis.unresolved} accent="#ef4444"
+        <KpiCard title="Unresolved" value={kpis.unresolved} accent="#ef4444"
           onClick={() => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'unresolved', title: 'Unresolved Threats' } })} />
-        <KpiCard title="Fileless"      value={kpis.fileless}   accent="#f59e0b" />
-        <KpiCard title="Avg MTTD"      value={formatDuration(kpis.avgMttd)} accent="#8b5cf6" subtitle="time to detect" />
-        <KpiCard title="Avg MTTM"      value={formatDuration(kpis.avgMttm)} accent="#06b6d4" subtitle="time to mitigate" />
+        <KpiCard title="Fileless" value={kpis.fileless} accent="#f59e0b" />
+        <KpiCard title="Avg MTTD" value={formatDuration(kpis.avgMttd)} accent="#8b5cf6" subtitle="time to detect" />
+        <KpiCard title="Avg MTTM" value={formatDuration(kpis.avgMttm)} accent="#06b6d4" subtitle="time to mitigate" />
       </div>
 
       {/* Threat Trend */}
@@ -500,19 +501,21 @@ export default function Threats() {
           {topEndpoints.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topEndpoints} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
-                  <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" cursor="pointer"
-                    onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'topEndpoint', value: data.fullName, title: `Threats on ${data.fullName}` } })} />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={topEndpoints} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" cursor="pointer"
+                  onClick={(data) => navigate('/security/detail', { state: { dataset: 'threats', filterId: 'topEndpoint', value: data.fullName, title: `Threats on ${data.fullName}` } })} />
+              </BarChart>
+            </ResponsiveContainer>
           }
         </ChartCard>
+        <ChartCard title="SentinelOne MTTR" subtitle="Threat count per machine" height={300}>
+          <S1Mttr total={kpis.total} mitigated={kpis.mitigated}/>
+        </ChartCard>
 
-        
       </div>
 
       {/* MITRE ATT&CK Matrix */}
@@ -559,14 +562,14 @@ export default function Threats() {
           {mitigationRateData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No mitigation data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={mitigationRateData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2}>
-                    {mitigationRateData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-                  </Pie>
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
+              <PieChart>
+                <Pie data={mitigationRateData} innerRadius="38%" outerRadius="62%" dataKey="value" paddingAngle={2}>
+                  {mitigationRateData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
+                </Pie>
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+              </PieChart>
+            </ResponsiveContainer>
           }
         </ChartCard>
       </div>
@@ -578,14 +581,14 @@ export default function Threats() {
           {topUsersData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No user data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={topUsersData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
-                  <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={topUsersData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="value" fill="#f59e0b" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
+              </BarChart>
+            </ResponsiveContainer>
           }
         </ChartCard>
 
@@ -645,14 +648,14 @@ export default function Threats() {
           {bySiteData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No site data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={bySiteData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
-                  <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={bySiteData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="value" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
+              </BarChart>
+            </ResponsiveContainer>
           }
         </ChartCard>
 
@@ -661,14 +664,14 @@ export default function Threats() {
           {byGroupData.length === 0
             ? <div className="flex items-center justify-center h-full"><p className="text-sm text-[var(--muted)]">No group data</p></div>
             : <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={byGroupData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
-                  <XAxis type="number"   tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Bar dataKey="value" fill="#ec4899" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart data={byGroupData} layout="vertical" margin={{ top: 8, right: 16, left: 8, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: 'var(--muted)' }} width={110} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: 'var(--muted)' }} allowDecimals={false} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Bar dataKey="value" fill="#ec4899" radius={[0, 4, 4, 0]} maxBarSize={18} name="Threats" />
+              </BarChart>
+            </ResponsiveContainer>
           }
         </ChartCard>
       </div>
